@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Secrets / 環境変数（絶対にコミットしないこと）
+.env
+*.env

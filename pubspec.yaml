@@ -47,6 +47,7 @@ dependencies:
   google_fonts: ^8.1.0
   intl: ^0.20.2
   uuid: ^4.5.3
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -73,10 +74,8 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  assets:
+    - .env  # Mapbox アクセストークン（gitignore 対象・本番前に保護トークンへ差し替え）
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

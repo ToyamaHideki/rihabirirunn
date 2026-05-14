@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'shared/router/app_router.dart';
 import 'shared/theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
+  // .env を読み込んでから起動（Mapbox トークン等）
+  await dotenv.load(fileName: '.env');
+
   runApp(
     const ProviderScope(
       child: RihabiriRunApp(),
