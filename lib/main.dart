@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'shared/router/app_router.dart';
+
 void main() {
   runApp(
     const ProviderScope(
@@ -9,23 +11,19 @@ void main() {
   );
 }
 
-class RihabiriRunApp extends StatelessWidget {
+class RihabiriRunApp extends ConsumerWidget {
   const RihabiriRunApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+    return MaterialApp.router(
       title: 'リハビリラン',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4CAF82)),
         useMaterial3: true,
       ),
-      // TODO(T-0.3): GoRouter に差し替える
-      home: const Scaffold(
-        body: Center(
-          child: Text('リハビリラン', style: TextStyle(fontSize: 24)),
-        ),
-      ),
+      routerConfig: router,
     );
   }
 }
