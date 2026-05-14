@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'shared/router/app_router.dart';
+import 'shared/theme/app_theme.dart';
 
 void main() {
   runApp(
@@ -17,12 +18,10 @@ class RihabiriRunApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final theme = ref.watch(appThemeProvider);
     return MaterialApp.router(
       title: 'リハビリラン',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4CAF82)),
-        useMaterial3: true,
-      ),
+      theme: theme,
       routerConfig: router,
     );
   }
