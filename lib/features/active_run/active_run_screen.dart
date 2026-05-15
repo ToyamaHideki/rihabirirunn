@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../../shared/repositories/run_session_repository.dart';
+import '../../shared/repositories/user_profile_repository.dart';
 import '../../shared/router/app_routes.dart';
 import '../../shared/services/tracking_service.dart';
 import '../../shared/widgets/app_map.dart';
@@ -35,6 +37,9 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
   RoutePreviewArgs? _args;
   bool _initialized = false;
 
+  // T-2.4.1: 走行開始時刻（DB 保存時に使用）
+  DateTime? _startedAt;
+
   // T-2.3.4: バッテリー状態
   final Battery _battery = Battery();
   int? _batteryLevel;
@@ -60,6 +65,7 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
       await WakelockPlus.enable();
       // GPS 追跡開始
       if (mounted) {
+        _startedAt = DateTime.now(); // T-2.4.1: 開始時刻を記録
         await ref.read(trackingNotifierProvider.notifier).start();
       }
       // T-2.3.4: バッテリー初回チェック
@@ -144,11 +150,35 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
     );
 
     if (confirmed == true && mounted) {
-      // 追跡停止（T-2.4 で DB 保存・sessionId 取得を行う）
-      await ref.read(trackingNotifierProvider.notifier).stop();
-      if (mounted) {
-        // サマリー画面へ（T-2.4 実装後に実際の sessionId に置き換え）
-        context.go(AppRoutes.runSummaryPath('pending'));
+      // 追跡停止
+      final finalState =
+          await ref.read(trackingNotifierProvider.notifier).stop();
+      if (!mounted) return;
+
+      // T-2.4.1: DB 保存 → sessionId 取得
+      final profile =
+          await ref.read(userProfileRepositoryProvider).getProfile();
+      if (!mounted) return;
+
+      if (profile != null) {
+        final sessionId =
+            await ref.read(runSessionRepositoryProvider).saveSession(
+          userId: profile.id,
+          startedAt: _startedAt ??
+              DateTime.now()
+                  .subtract(Duration(seconds: finalState.elapsedSeconds)),
+          trackingState: finalState,
+          plannedDistanceM: _args?.distanceMeters,
+          routeType: _args?.routeType,
+          routePoints: _args?.routeResult.points,
+          departurePoint: _args?.departure,
+        );
+        if (mounted) {
+          context.go(AppRoutes.runSummaryPath(sessionId));
+        }
+      } else {
+        // プロフィールなし（通常は発生しない）
+        if (mounted) context.go(AppRoutes.home);
       }
     }
   }
