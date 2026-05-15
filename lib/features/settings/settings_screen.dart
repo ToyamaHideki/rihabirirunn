@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import '../../database/database.dart';
 import '../../shared/repositories/user_profile_repository.dart';
 import '../../shared/repositories/user_settings_repository.dart';
 import '../../shared/router/app_routes.dart';
+import '../../shared/services/debug_data_service.dart';
 import '../../shared/theme/app_font_scale.dart';
 import '../../shared/theme/app_theme.dart';
 
@@ -30,11 +32,70 @@ final _settingsUserSettingsProvider = FutureProvider<UserSetting?>((ref) async {
 /// S50: 設定
 ///
 /// T-4.1.1: 設定トップ画面
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _debugLoading = false;
+
+  Future<void> _injectDummy() async {
+    setState(() => _debugLoading = true);
+    try {
+      final count = await ref.read(debugDataServiceProvider).injectDummyData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$count 件のダミーデータを投入しました')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('エラー: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _debugLoading = false);
+    }
+  }
+
+  Future<void> _clearDummy() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('走行データを全削除'),
+        content: const Text('全セッション・体調ログを削除します。元に戻せません。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade600),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _debugLoading = true);
+    try {
+      await ref.read(debugDataServiceProvider).clearAllSessions();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('走行データを全削除しました')),
+      );
+    } finally {
+      if (mounted) setState(() => _debugLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final profile = ref.watch(_settingsProfileProvider).valueOrNull;
     final settings = ref.watch(_settingsUserSettingsProvider).valueOrNull;
@@ -134,6 +195,33 @@ class SettingsScreen extends ConsumerWidget {
             title: 'アプリ情報',
             onTap: () => context.push(AppRoutes.appInfo),
           ),
+          // ---- デバッグ（kDebugMode のみ表示）----
+          if (kDebugMode) ...[
+            const Divider(indent: 16, endIndent: 16, height: 8),
+            const _SectionHeader(label: '🐞 DEBUG'),
+            _debugLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : Column(
+                    children: [
+                      _SettingsTile(
+                        icon: Icons.science_outlined,
+                        title: 'ダミーデータを投入',
+                        subtitle: '直近12週・約20件の走行データを追加',
+                        onTap: _injectDummy,
+                      ),
+                      _SettingsTile(
+                        icon: Icons.delete_sweep_outlined,
+                        title: '走行データを全削除',
+                        subtitle: 'セッション・体調ログをすべて消去',
+                        onTap: _clearDummy,
+                      ),
+                    ],
+                  ),
+          ],
+
           const SizedBox(height: 32),
         ],
       ),
