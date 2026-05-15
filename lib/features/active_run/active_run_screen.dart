@@ -12,6 +12,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../shared/repositories/run_session_repository.dart';
 import '../../shared/repositories/user_profile_repository.dart';
 import '../../shared/router/app_routes.dart';
+import '../../shared/services/target_distance_service.dart';
 import '../../shared/services/tracking_service.dart';
 import '../../shared/widgets/app_map.dart';
 import '../route_generation/route_preview_args.dart';
@@ -173,6 +174,18 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
           routePoints: _args?.routeResult.points,
           departurePoint: _args?.departure,
         );
+        if (!mounted) return;
+
+        // T-3.2.3: 走行完了後の目標距離自動更新
+        final savedSession =
+            await ref.read(runSessionRepositoryProvider).getSession(sessionId);
+        if (!mounted) return;
+        if (savedSession != null) {
+          await ref.read(targetDistanceServiceProvider).updateAfterRun(
+                profile: profile,
+                session: savedSession,
+              );
+        }
         if (mounted) {
           context.go(AppRoutes.runSummaryPath(sessionId));
         }

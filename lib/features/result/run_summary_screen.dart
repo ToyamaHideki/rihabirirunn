@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../database/database.dart';
 import '../../shared/repositories/run_session_repository.dart';
+import '../../shared/repositories/user_profile_repository.dart';
 import '../../shared/router/app_routes.dart';
 import '../../shared/widgets/app_map.dart';
 
@@ -29,6 +30,7 @@ class RunSummaryScreen extends ConsumerStatefulWidget {
 class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
   RunSession? _session;
   List<GpsPoint> _gpsPoints = const [];
+  UserProfile? _profile;
   bool _loading = true;
   String? _error;
 
@@ -50,10 +52,14 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
       final repo = ref.read(runSessionRepositoryProvider);
       final session = await repo.getSession(widget.sessionId);
       final points = await repo.getGpsPoints(widget.sessionId);
+      // T-3.2.4: 次回目標表示のためにプロフィール取得
+      final profile =
+          await ref.read(userProfileRepositoryProvider).getProfile();
       if (mounted) {
         setState(() {
           _session = session;
           _gpsPoints = points;
+          _profile = profile;
           _loading = false;
         });
       }
@@ -327,6 +333,14 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
                     actualM: session.actualDistance,
                     achieveRatePct: achieveRatePct,
                   ),
+                  const SizedBox(height: 16),
+
+                  // T-3.2.4: 次回目標距離
+                  if (_profile != null)
+                    _NextTargetCard(
+                      profile: _profile!,
+                      basePlannedM: session.plannedDistance,
+                    ),
                   const SizedBox(height: 28),
 
                   // 走行後体調入力へ（T-3.1: conditionPost 経由でホームへ）
@@ -559,6 +573,128 @@ class _PlanVsActualRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// T-3.2.4: 次回目標距離カード
+// ---------------------------------------------------------------------------
+
+class _NextTargetCard extends StatelessWidget {
+  const _NextTargetCard({
+    required this.profile,
+    required this.basePlannedM,
+  });
+
+  final UserProfile profile;
+
+  /// 今回の計画距離（変化の基準に使用）
+  final double basePlannedM;
+
+  String _fmtM(double m) {
+    if (m >= 1000) {
+      return '${(m / 1000).toStringAsFixed(2)} km';
+    }
+    return '${m.round()} m';
+  }
+
+  String _modeLabel(String mode) {
+    switch (mode) {
+      case 'conservative':
+        return '慎重';
+      case 'standard':
+        return '標準';
+      case 'challenge':
+        return 'チャレンジ';
+      case 'custom':
+        return 'カスタム';
+      default:
+        return mode;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final nextTarget = profile.currentTargetDistance;
+    final delta = nextTarget - basePlannedM;
+    final isCustom = profile.mode == 'custom';
+
+    String deltaText;
+    Color deltaColor;
+    if (isCustom) {
+      deltaText = 'カスタムモード（手動設定）';
+      deltaColor = colorScheme.onSurfaceVariant;
+    } else if (delta.abs() < 50) {
+      deltaText = '変更なし';
+      deltaColor = colorScheme.onSurfaceVariant;
+    } else if (delta > 0) {
+      final pct = (delta / basePlannedM * 100).round();
+      deltaText = '+${_fmtM(delta)} (+$pct%)';
+      deltaColor = colorScheme.primary;
+    } else {
+      final pct = (delta / basePlannedM * 100).round();
+      deltaText = '${_fmtM(delta)} ($pct%)';
+      deltaColor = Colors.orange;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.flag_rounded,
+              color: colorScheme.primary, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '次回の目標',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  _fmtM(nextTarget),
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _modeLabel(profile.mode),
+                style: textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(
+                deltaText,
+                style: textTheme.bodySmall?.copyWith(
+                  color: deltaColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
