@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -210,7 +210,14 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
 
   /// T-2.1.5: プラットフォーム別 LocationSettings
   LocationSettings _buildLocationSettings() {
-    if (Platform.isAndroid) {
+    // Web はフォアグラウンドのみ対応（ブラウザ Geolocation API）
+    if (kIsWeb) {
+      return const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      );
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
       return AndroidSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 5, // T-2.1.1: 5m 移動ごとに更新
@@ -223,7 +230,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         ),
       );
     }
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       return AppleSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 5, // T-2.1.1

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -66,14 +65,10 @@ class _DataManagementScreenState
     setState(() => _importing = true);
     try {
       final file = result.files.first;
-      final String content;
-      if (file.bytes != null) {
-        content = utf8.decode(file.bytes!);
-      } else if (file.path != null) {
-        content = await File(file.path!).readAsString();
-      } else {
-        throw Exception('ファイルを読み込めませんでした');
-      }
+      // withData: true により全プラットフォーム（Web 含む）で bytes が取得できる
+      final bytes = file.bytes;
+      if (bytes == null) throw Exception('ファイルを読み込めませんでした');
+      final String content = utf8.decode(bytes);
 
       // パース・バリデーション
       final summary =

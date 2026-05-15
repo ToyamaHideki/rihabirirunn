@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:battery_plus/battery_plus.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -62,30 +63,32 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
 
     // 画面構築後に追跡開始・画面オフ防止・バッテリー監視を設定
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // T-2.2.6: 画面オフ防止
-      await WakelockPlus.enable();
+      // T-2.2.6: 画面オフ防止（Web 非対応）
+      if (!kIsWeb) await WakelockPlus.enable();
       // GPS 追跡開始
       if (mounted) {
         _startedAt = DateTime.now(); // T-2.4.1: 開始時刻を記録
         await ref.read(trackingNotifierProvider.notifier).start();
       }
-      // T-2.3.4: バッテリー初回チェック
-      if (mounted) _updateBattery();
+      // T-2.3.4: バッテリー初回チェック（Web 非対応）
+      if (!kIsWeb && mounted) _updateBattery();
     });
 
-    // T-2.3.4: バッテリーを 60 秒ごとにチェック
-    _batteryTimer = Timer.periodic(
-      const Duration(seconds: 60),
-      (_) {
-        if (mounted) _updateBattery();
-      },
-    );
+    // T-2.3.4: バッテリーを 60 秒ごとにチェック（Web 非対応）
+    if (!kIsWeb) {
+      _batteryTimer = Timer.periodic(
+        const Duration(seconds: 60),
+        (_) {
+          if (mounted) _updateBattery();
+        },
+      );
+    }
   }
 
   @override
   void dispose() {
-    // T-2.2.6: 画面オフ防止を解除
-    WakelockPlus.disable();
+    // T-2.2.6: 画面オフ防止を解除（Web 非対応）
+    if (!kIsWeb) WakelockPlus.disable();
     _batteryTimer?.cancel();
     super.dispose();
   }

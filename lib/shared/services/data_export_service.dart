@@ -1,9 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../database/database.dart';
@@ -25,18 +23,24 @@ class DataExportService {
   // Public API
   // ---------------------------------------------------------------------------
 
-  /// T-4.2.2: JSON ファイルを一時ディレクトリに書き出し、共有シートを表示する
+  /// T-4.2.2: JSON をメモリ上でエクスポートし、共有シートを表示する
+  ///
+  /// XFile.fromData を使用することで dart:io に依存せず
+  /// iOS / Android / Web すべてで動作する。
   Future<void> exportAndShare() async {
     final data = await _buildExportData();
     final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
-
-    final dir = await getTemporaryDirectory();
+    final bytes = Uint8List.fromList(utf8.encode(jsonStr));
     final ts = DateTime.now().millisecondsSinceEpoch;
-    final file = File('${dir.path}/rehabili_run_$ts.json');
-    await file.writeAsString(jsonStr, encoding: utf8);
 
     await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/json')],
+      [
+        XFile.fromData(
+          bytes,
+          name: 'rehabili_run_$ts.json',
+          mimeType: 'application/json',
+        ),
+      ],
       subject: 'リハビリウォークデータ',
       text: 'リハビリウォークのバックアップデータです（v$_kAppVersion）',
     );

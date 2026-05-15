@@ -37,6 +37,7 @@ dependencies:
   flutter_riverpod: ^2.5.1
   riverpod_annotation: ^2.3.5
   drift: ^2.20.3
+  drift_flutter: ^0.2.0   # iOS/Android/Web 全対応の DB 接続ヘルパー
   sqlite3_flutter_libs: ^0.5.4
   path_provider: ^2.1.5
   path: ^1.9.1

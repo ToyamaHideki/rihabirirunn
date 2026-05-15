@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../database/database.dart';
+import '../../shared/repositories/condition_log_repository.dart';
 import '../../shared/repositories/history_repository.dart';
 import '../../shared/repositories/user_profile_repository.dart';
 import '../../shared/router/app_routes.dart';
@@ -45,9 +46,8 @@ class _MonthlySummary {
 ///
 /// T-3.3.1: カレンダーUI（達成●/未達成○ ドット）
 /// T-3.3.2: 月間サマリ（実施日数・累計距離・最長距離・平均ペース）
-/// T-3.3.3: 日付タップでセッション一覧 BottomSheet
+/// T-3.3.3: 日付タップでセッション一覧 BottomSheet（痛みスコア表示付き）
 /// T-3.3.5: 月切り替え（← → ボタン + 左右スワイプ）
-/// T-3.3.6: 全走行履歴リスト（降順ソート）
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
@@ -59,7 +59,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   // 現在表示中の月（day=1 で統一）
   DateTime _currentMonth = DateUtils.dateOnly(DateTime.now()).copyWith(day: 1);
   List<RunSession> _monthSessions = [];
-  List<RunSession> _allSessions = [];
   String? _userId;
   bool _loading = true;
 
@@ -81,18 +80,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       return;
     }
 
-    final repo = ref.read(historyRepositoryProvider);
-    final results = await Future.wait([
-      repo.getSessionsForMonth(
-          profile.id, _currentMonth.year, _currentMonth.month),
-      repo.getAllSessionsDesc(profile.id),
-    ]);
+    final sessions = await ref
+        .read(historyRepositoryProvider)
+        .getSessionsForMonth(profile.id, _currentMonth.year, _currentMonth.month);
 
     if (!mounted) return;
     setState(() {
       _userId = profile.id;
-      _monthSessions = results[0];
-      _allSessions = results[1];
+      _monthSessions = sessions;
       _loading = false;
     });
   }
@@ -257,48 +252,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   ),
                 ),
 
-                const Divider(height: 24),
+                const Divider(height: 16),
 
                 // ---- T-3.3.2: 月間サマリ ----
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: _MonthlySummarySection(summary: summary),
                 ),
-
-                const Divider(height: 24),
-
-                // ---- T-3.3.6: 全走行履歴リスト ----
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Text(
-                    '走行履歴',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                if (_allSessions.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 32),
-                    child: Center(
-                      child: Text('走行記録がまだありません'),
-                    ),
-                  )
-                else
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _allSessions.length,
-                    separatorBuilder: (sepCtx, sepIdx) =>
-                        const Divider(height: 1, indent: 16),
-                    itemBuilder: (ctx, i) => _SessionListTile(
-                      session: _allSessions[i],
-                      onTap: () => context
-                          .push(AppRoutes.runDetailPath(_allSessions[i].id)),
-                    ),
-                  ),
-                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -392,7 +352,7 @@ class _MonthCalendar extends StatelessWidget {
           child: Text(
             h,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               color: h == '日' ? Colors.red.shade400 : null,
             ),
@@ -415,7 +375,8 @@ class _MonthCalendar extends StatelessWidget {
       crossAxisCount: 7,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 0.85,
+      // 1.1 にすることでセルを正方形に近くし縦方向を圧縮
+      childAspectRatio: 1.1,
       children: cells,
     );
   }
@@ -448,8 +409,8 @@ class _DayCell extends StatelessWidget {
     Widget dotWidget;
     if (result != null) {
       dotWidget = Container(
-        width: 6,
-        height: 6,
+        width: 5,
+        height: 5,
         margin: const EdgeInsets.only(top: 2),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
@@ -457,7 +418,7 @@ class _DayCell extends StatelessWidget {
         ),
       );
     } else {
-      dotWidget = const SizedBox(width: 6, height: 8);
+      dotWidget = const SizedBox(width: 5, height: 7);
     }
 
     // T-4.3.3: スクリーンリーダー向けラベル
@@ -472,13 +433,13 @@ class _DayCell extends StatelessWidget {
       button: result != null,
       child: InkWell(
         onTap: result != null ? onTap : null,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isToday ? colorScheme.primary : null,
@@ -487,7 +448,7 @@ class _DayCell extends StatelessWidget {
                 child: Text(
                   '$day',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: textColor,
                     fontWeight:
                         isToday ? FontWeight.bold : FontWeight.normal,
@@ -504,7 +465,7 @@ class _DayCell extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// T-3.3.2: 月間サマリセクション
+// T-3.3.2: 月間サマリセクション（横1行コンパクトレイアウト）
 // ---------------------------------------------------------------------------
 
 class _MonthlySummarySection extends StatelessWidget {
@@ -520,11 +481,12 @@ class _MonthlySummarySection extends StatelessWidget {
     if (secPerKm == null || secPerKm <= 0) return '--';
     final min = (secPerKm ~/ 60).toString().padLeft(2, '0');
     final sec = (secPerKm.round() % 60).toString().padLeft(2, '0');
-    return "$min'$sec\"/km";
+    return "$min'$sec\"";
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -532,43 +494,55 @@ class _MonthlySummarySection extends StatelessWidget {
           '今月のサマリ',
           style: Theme.of(context)
               .textTheme
-              .titleMedium
+              .titleSmall
               ?.copyWith(fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: 2.4,
-          children: [
-            _SummaryCard(
-              label: '実施日数',
-              value: '${summary.runDays} / ${summary.calendarDays} 日',
-            ),
-            _SummaryCard(
-              label: '累計距離',
-              value: _fmtDist(summary.totalDistanceM),
-            ),
-            _SummaryCard(
-              label: '最長距離',
-              value: _fmtDist(summary.maxDistanceM),
-            ),
-            _SummaryCard(
-              label: '平均ペース',
-              value: _fmtPace(summary.avgPaceSecPerKm),
-            ),
-          ],
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _CompactStat(
+                  label: '実施日数',
+                  value: '${summary.runDays}/${summary.calendarDays}日',
+                ),
+              ),
+              _Divider(),
+              Expanded(
+                child: _CompactStat(
+                  label: '累計距離',
+                  value: _fmtDist(summary.totalDistanceM),
+                ),
+              ),
+              _Divider(),
+              Expanded(
+                child: _CompactStat(
+                  label: '最長距離',
+                  value: _fmtDist(summary.maxDistanceM),
+                ),
+              ),
+              _Divider(),
+              Expanded(
+                child: _CompactStat(
+                  label: '平均ペース',
+                  value: _fmtPace(summary.avgPaceSecPerKm),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.label, required this.value});
+class _CompactStat extends StatelessWidget {
+  const _CompactStat({required this.label, required this.value});
   final String label;
   final String value;
 
@@ -576,32 +550,44 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: textTheme.labelSmall
+              ?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: 10),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: textTheme.bodySmall
-                  ?.copyWith(color: colorScheme.onSurfaceVariant)),
-          Text(value,
-              style: textTheme.bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-        ],
-      ),
+      width: 1,
+      height: 32,
+      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// T-3.3.3: 日付BottomSheet
+// T-3.3.3: 日付BottomSheet（体調ログ付き）
 // ---------------------------------------------------------------------------
 
-class _DaySessionSheet extends StatelessWidget {
+class _DaySessionSheet extends ConsumerStatefulWidget {
   const _DaySessionSheet({
     required this.date,
     required this.sessions,
@@ -613,8 +599,43 @@ class _DaySessionSheet extends StatelessWidget {
   final ValueChanged<String> onSessionTap;
 
   @override
+  ConsumerState<_DaySessionSheet> createState() => _DaySessionSheetState();
+}
+
+class _DaySessionSheetState extends ConsumerState<_DaySessionSheet> {
+  // sessionId → (painBefore, painAfter, memo)
+  final Map<String, ({int? before, int? after, String? memo})> _painData = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConditionLogs();
+  }
+
+  Future<void> _loadConditionLogs() async {
+    final condRepo = ref.read(conditionLogRepositoryProvider);
+    final newData = <String, ({int? before, int? after, String? memo})>{};
+    for (final s in widget.sessions) {
+      final logs = await condRepo.getConditionLogsForSession(s.id);
+      final before = logs.where((l) => l.timing == 'before').firstOrNull;
+      final after = logs.where((l) => l.timing == 'after').firstOrNull;
+      newData[s.id] = (
+        before: before?.painScore,
+        after: after?.painScore,
+        // 走行後メモを優先、なければ走行前メモ
+        memo: (after?.memo?.isNotEmpty ?? false)
+            ? after!.memo
+            : (before?.memo?.isNotEmpty ?? false)
+                ? before!.memo
+                : null,
+      );
+    }
+    if (mounted) setState(() => _painData.addAll(newData));
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final label = DateFormat('M月d日(E)', 'ja').format(date);
+    final label = DateFormat('M月d日(E)', 'ja').format(widget.date);
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.5,
@@ -636,27 +657,43 @@ class _DaySessionSheet extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                label,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Text(
+                  '詳細をタップで確認',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
             ),
           ),
           Expanded(
             child: ListView.separated(
               controller: controller,
-              itemCount: sessions.length,
-              separatorBuilder: (sepCtx, sepIdx) =>
+              itemCount: widget.sessions.length,
+              separatorBuilder: (_, _) =>
                   const Divider(height: 1, indent: 16),
-              itemBuilder: (ctx, i) => _SessionListTile(
-                session: sessions[i],
-                onTap: () => onSessionTap(sessions[i].id),
-              ),
+              itemBuilder: (ctx, i) {
+                final s = widget.sessions[i];
+                final pain = _painData[s.id];
+                return _DaySessionTile(
+                  session: s,
+                  painBefore: pain?.before,
+                  painAfter: pain?.after,
+                  memo: pain?.memo,
+                  onTap: () => widget.onSessionTap(s.id),
+                );
+              },
             ),
           ),
         ],
@@ -666,25 +703,27 @@ class _DaySessionSheet extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// T-3.3.6: セッションリストタイル（共用）
+// BottomSheet内セッションタイル（痛みスコア・メモ表示付き）
 // ---------------------------------------------------------------------------
 
-class _SessionListTile extends StatelessWidget {
-  const _SessionListTile({
+class _DaySessionTile extends StatelessWidget {
+  const _DaySessionTile({
     required this.session,
+    required this.painBefore,
+    required this.painAfter,
+    required this.memo,
     required this.onTap,
   });
 
   final RunSession session;
+  final int? painBefore;
+  final int? painAfter;
+  final String? memo;
   final VoidCallback onTap;
 
   String _fmtDist(double m) {
     if (m >= 1000) return '${(m / 1000).toStringAsFixed(2)} km';
     return '${m.round()} m';
-  }
-
-  String _fmtDate(DateTime dt) {
-    return DateFormat('M/d (E)', 'ja').format(dt);
   }
 
   String _fmtElapsed(int sec) {
@@ -693,13 +732,32 @@ class _SessionListTile extends StatelessWidget {
     return "$m'${s.toString().padLeft(2, '0')}\"";
   }
 
+  Color _painColor(int? score, ColorScheme cs) {
+    if (score == null) return cs.onSurfaceVariant;
+    if (score <= 2) return cs.primary;
+    if (score <= 5) return Colors.orange.shade700;
+    return cs.error;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    // 痛みスコア表示テキスト
+    String? painText;
+    if (painBefore != null || painAfter != null) {
+      final parts = <String>[];
+      if (painBefore != null) parts.add('前 $painBefore');
+      if (painAfter != null) parts.add('後 $painAfter');
+      painText = '痛み: ${parts.join(' → ')}';
+    }
+
+    final hasExtraInfo = painText != null || (memo?.isNotEmpty ?? false);
+
     return ListTile(
       onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 40,
         height: 40,
@@ -719,18 +777,73 @@ class _SessionListTile extends StatelessWidget {
           size: 20,
         ),
       ),
-      title: Text(
-        _fmtDate(session.startedAt),
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      title: Row(
+        children: [
+          Text(
+            _fmtDist(session.actualDistance),
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _fmtElapsed(session.durationSeconds),
+            style: textTheme.bodySmall
+                ?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+        ],
       ),
-      subtitle: Text(
-        _fmtDist(session.actualDistance),
-        style: textTheme.bodySmall
-            ?.copyWith(color: colorScheme.onSurfaceVariant),
-      ),
-      trailing: Text(
-        _fmtElapsed(session.durationSeconds),
-        style: textTheme.bodySmall,
+      subtitle: hasExtraInfo
+          ? Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (painText != null)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.favorite_rounded,
+                          size: 12,
+                          color: _painColor(painAfter, colorScheme),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          painText,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: _painColor(painAfter, colorScheme),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (memo != null && memo!.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.notes_rounded,
+                          size: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            memo!,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            )
+          : null,
+      trailing: Icon(
+        Icons.chevron_right_rounded,
+        color: colorScheme.onSurfaceVariant,
+        size: 20,
       ),
     );
   }

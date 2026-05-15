@@ -1,10 +1,6 @@
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
+import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import 'tables/condition_logs.dart';
 import 'tables/gps_points.dart';
@@ -25,7 +21,9 @@ part 'database.g.dart';
   PainAreas,
 ])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  /// [driftDatabase] は iOS/Android/Web を自動判別する drift_flutter の公式ヘルパー。
+  /// Web では IndexedDB + WASM SQLite、Native では SQLite ファイルを使用する。
+  AppDatabase() : super(driftDatabase(name: 'rihabiri_run'));
 
   @override
   int get schemaVersion => 1;
@@ -68,15 +66,6 @@ class AppDatabase extends _$AppDatabase {
       },
     );
   }
-}
-
-/// DB 接続を遅延オープン（アプリ起動時に documents ディレクトリを確定）
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'rihabiri_run.db'));
-    return NativeDatabase.createInBackground(file);
-  });
 }
 
 /// Riverpod プロバイダ

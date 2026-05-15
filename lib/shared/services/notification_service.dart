@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,6 +17,7 @@ class NotificationService {
 
   /// プラグインを初期化する（走行開始時に自動呼び出し）
   Future<void> init() async {
+    if (kIsWeb) return; // Web は通知非対応
     if (_initialized) return;
 
     const androidInit =
@@ -40,6 +42,7 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
+    if (kIsWeb) return;
     await init();
 
     final androidDetails = AndroidNotificationDetails(
@@ -70,7 +73,7 @@ class NotificationService {
 
   /// 走行通知をキャンセルする（走行終了時に呼び出す）
   Future<void> cancelRunningNotification() async {
-    if (!_initialized) return;
+    if (kIsWeb || !_initialized) return;
     await _plugin.cancel(_notificationId);
   }
 }
