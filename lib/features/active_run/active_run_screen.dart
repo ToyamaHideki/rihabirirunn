@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -19,6 +22,8 @@ import '../route_generation/route_preview_args.dart';
 /// T-2.2.4: 一時停止・再開ボタン
 /// T-2.2.5: 終了ボタン（確認ダイアログ）→ サマリー画面へ
 /// T-2.2.6: 画面オフ防止（WakelockPlus）
+/// T-2.3.3: GPS ロスト警告バナー
+/// T-2.3.4: バッテリー残量低下（20% 以下）警告バナー
 class ActiveRunScreen extends ConsumerStatefulWidget {
   const ActiveRunScreen({super.key});
 
@@ -29,6 +34,11 @@ class ActiveRunScreen extends ConsumerStatefulWidget {
 class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
   RoutePreviewArgs? _args;
   bool _initialized = false;
+
+  // T-2.3.4: バッテリー状態
+  final Battery _battery = Battery();
+  int? _batteryLevel;
+  Timer? _batteryTimer;
 
   // ---- ライフサイクル ----
 
@@ -44,7 +54,7 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
       _args = extra;
     }
 
-    // 画面構築後に追跡開始・画面オフ防止を設定
+    // 画面構築後に追跡開始・画面オフ防止・バッテリー監視を設定
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // T-2.2.6: 画面オフ防止
       await WakelockPlus.enable();
@@ -52,14 +62,38 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
       if (mounted) {
         await ref.read(trackingNotifierProvider.notifier).start();
       }
+      // T-2.3.4: バッテリー初回チェック
+      if (mounted) _updateBattery();
     });
+
+    // T-2.3.4: バッテリーを 60 秒ごとにチェック
+    _batteryTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) {
+        if (mounted) _updateBattery();
+      },
+    );
   }
 
   @override
   void dispose() {
     // T-2.2.6: 画面オフ防止を解除
     WakelockPlus.disable();
+    _batteryTimer?.cancel();
     super.dispose();
+  }
+
+  // ---- T-2.3.4: バッテリー取得 ----
+
+  Future<void> _updateBattery() async {
+    try {
+      final level = await _battery.batteryLevel;
+      if (mounted) {
+        setState(() => _batteryLevel = level);
+      }
+    } catch (_) {
+      // バッテリー情報が取得できない端末（エミュレーターなど）では無視
+    }
   }
 
   // ---- ユーティリティ ----
@@ -157,6 +191,16 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
           )
         : null;
 
+    // T-2.3.4: バッテリー警告表示条件（20% 以下、走行中 or 一時停止中）
+    final showBatteryWarning =
+        _batteryLevel != null &&
+        _batteryLevel! <= 20 &&
+        trackingState.isActive;
+
+    // 警告バナーの縦位置: stats overlay の下
+    // stats overlay: top + 8 + 約68px = top + 76
+    final warningTop = padding.top + 80.0;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       // ステータスバーアイコンを白に（地図背景が暗い場合に視認性確保）
       value: SystemUiOverlayStyle.light,
@@ -185,14 +229,44 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
               left: 12,
               right: 12,
               child: _StatsOverlay(
-                formattedDistance:
-                    trackingState.formattedDistance,
+                formattedDistance: trackingState.formattedDistance,
                 formattedPace: trackingState.formattedPace,
                 formattedElapsed: trackingState.formattedElapsed,
                 formattedRemaining:
                     _formatRemaining(trackingState.distanceMeters),
               ),
             ),
+
+            // ---- T-2.3.3 / T-2.3.4: 警告バナー群（stats の下） ----
+            if (trackingState.gpsLost || showBatteryWarning)
+              Positioned(
+                top: warningTop,
+                left: 12,
+                right: 12,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // T-2.3.3: GPS ロスト
+                    if (trackingState.gpsLost && trackingState.isActive)
+                      _WarningBanner(
+                        icon: Icons.gps_off_rounded,
+                        message: 'GPS 信号ロスト',
+                        color: Colors.red.shade700,
+                      ),
+                    if (trackingState.gpsLost &&
+                        trackingState.isActive &&
+                        showBatteryWarning)
+                      const SizedBox(height: 4),
+                    // T-2.3.4: バッテリー低下
+                    if (showBatteryWarning)
+                      _WarningBanner(
+                        icon: Icons.battery_alert_rounded,
+                        message: 'バッテリー残量 $_batteryLevel%',
+                        color: Colors.orange.shade800,
+                      ),
+                  ],
+                ),
+              ),
 
             // ---- 一時停止バナー ----
             if (trackingState.isPaused)
@@ -355,6 +429,49 @@ class _StatDivider extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// T-2.3.3 / T-2.3.4: 警告バナー
+// ---------------------------------------------------------------------------
+
+class _WarningBanner extends StatelessWidget {
+  const _WarningBanner({
+    required this.icon,
+    required this.message,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String message;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            message,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // T-2.2.4 / T-2.2.5: コントロールバー
 // ---------------------------------------------------------------------------
 
@@ -376,7 +493,7 @@ class _ControlBar extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // T-2.2.4: 一時停止 / 再開ボタン
+        // T-2.2.4: 一時停止 / 再開
         _RoundButton(
           icon: isPaused
               ? Icons.play_arrow_rounded
@@ -389,7 +506,7 @@ class _ControlBar extends StatelessWidget {
           tooltip: isPaused ? '再開' : '一時停止',
         ),
         const SizedBox(width: 48),
-        // T-2.2.5: 終了ボタン
+        // T-2.2.5: 終了
         _RoundButton(
           icon: Icons.stop_rounded,
           backgroundColor: Colors.red.shade600,
