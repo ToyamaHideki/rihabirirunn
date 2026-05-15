@@ -42,6 +42,25 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _debugLoading = false;
 
+  Future<void> _injectMayDaily() async {
+    setState(() => _debugLoading = true);
+    try {
+      final count = await ref
+          .read(debugDataServiceProvider)
+          .injectMay2026DailyData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('5月分 $count 件を投入しました')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('エラー: $e')));
+    } finally {
+      if (mounted) setState(() => _debugLoading = false);
+    }
+  }
+
   Future<void> _injectDummy() async {
     setState(() => _debugLoading = true);
     try {
@@ -207,8 +226,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 : Column(
                     children: [
                       _SettingsTile(
+                        icon: Icons.calendar_month_outlined,
+                        title: '5月毎日データを投入',
+                        subtitle: '2026/5/1〜15 毎日1件・距離増加パターン',
+                        onTap: _injectMayDaily,
+                      ),
+                      _SettingsTile(
                         icon: Icons.science_outlined,
-                        title: 'ダミーデータを投入',
+                        title: 'ランダムデータを投入',
                         subtitle: '直近12週・約20件の走行データを追加',
                         onTap: _injectDummy,
                       ),
