@@ -317,34 +317,48 @@ class _WeekDot extends StatelessWidget {
       filled = false; // 走行したが未達成 → 外枠のみ
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // ドット
-        Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: filled ? dotColor : null,
-            border: Border.all(
-              color: dotColor,
-              width: status == null ? 1.0 : 2.0,
+    // T-4.3.3: スクリーンリーダー向けラベル
+    final String semanticLabel;
+    if (status == null) {
+      semanticLabel = '$label 走行なし';
+    } else if (status!) {
+      semanticLabel = '$label 目標達成';
+    } else {
+      semanticLabel = '$label 走行・未達成';
+    }
+
+    return Semantics(
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ドット
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: filled ? dotColor : null,
+              border: Border.all(
+                color: dotColor,
+                width: status == null ? 1.0 : 2.0,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 4),
-        // 曜日ラベル
-        Text(
-          label,
-          style: textTheme.labelSmall?.copyWith(
-            color: isToday
-                ? colorScheme.primary
-                : colorScheme.onSurfaceVariant,
-            fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+          const SizedBox(height: 4),
+          // 曜日ラベル
+          Text(
+            label,
+            style: textTheme.labelSmall?.copyWith(
+              color: isToday
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+              fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -39,18 +39,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const SplashScreen(),
       ),
 
-      // ---- オンボーディング ----
+      // ---- オンボーディング（T-4.3.1: スライドトランジション） ----
       GoRoute(
         path: AppRoutes.disclaimer,
-        builder: (_, _) => const DisclaimerScreen(),
+        pageBuilder: (ctx, state) =>
+            _slidePage(state, const DisclaimerScreen()),
       ),
       GoRoute(
         path: AppRoutes.setup,
-        builder: (_, _) => const SetupScreen(),
+        pageBuilder: (ctx, state) => _slidePage(state, const SetupScreen()),
       ),
       GoRoute(
         path: AppRoutes.design,
-        builder: (_, _) => const DesignScreen(),
+        pageBuilder: (ctx, state) =>
+            _slidePage(state, const DesignScreen()),
       ),
 
       // ---- メイン：ボトムナビ付きシェル（T-0.3.2） ----
@@ -71,8 +73,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: ':sessionId',
-                builder: (_, state) => RunDetailScreen(
-                  sessionId: state.pathParameters['sessionId']!,
+                pageBuilder: (ctx, state) => _slidePage(
+                  state,
+                  RunDetailScreen(
+                    sessionId: state.pathParameters['sessionId']!,
+                  ),
                 ),
               ),
             ],
@@ -83,35 +88,43 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: 'mode',
-                builder: (_, _) => const ModeSettingsScreen(),
+                pageBuilder: (ctx, state) =>
+                    _slidePage(state, const ModeSettingsScreen()),
               ),
               GoRoute(
                 path: 'body-info',
-                builder: (_, _) => const BodyInfoScreen(),
+                pageBuilder: (ctx, state) =>
+                    _slidePage(state, const BodyInfoScreen()),
               ),
               GoRoute(
                 path: 'display',
-                builder: (_, _) => const DisplaySettingsScreen(),
+                pageBuilder: (ctx, state) =>
+                    _slidePage(state, const DisplaySettingsScreen()),
               ),
               GoRoute(
                 path: 'data',
-                builder: (_, _) => const DataManagementScreen(),
+                pageBuilder: (ctx, state) =>
+                    _slidePage(state, const DataManagementScreen()),
               ),
               GoRoute(
                 path: 'notifications',
-                builder: (_, _) => const NotificationSettingsScreen(),
+                pageBuilder: (ctx, state) =>
+                    _slidePage(state, const NotificationSettingsScreen()),
               ),
               GoRoute(
                 path: 'terms',
-                builder: (_, _) => const TermsScreen(),
+                pageBuilder: (ctx, state) =>
+                    _slidePage(state, const TermsScreen()),
               ),
               GoRoute(
                 path: 'privacy',
-                builder: (_, _) => const PrivacyScreen(),
+                pageBuilder: (ctx, state) =>
+                    _slidePage(state, const PrivacyScreen()),
               ),
               GoRoute(
                 path: 'app-info',
-                builder: (_, _) => const AppInfoScreen(),
+                pageBuilder: (ctx, state) =>
+                    _slidePage(state, const AppInfoScreen()),
               ),
             ],
           ),
@@ -121,29 +134,37 @@ final routerProvider = Provider<GoRouter>((ref) {
       // ---- 走行フロー（フルスクリーン、シェル外） ----
       GoRoute(
         path: AppRoutes.routeSetting,
-        builder: (_, _) => const RouteSettingScreen(),
+        pageBuilder: (ctx, state) =>
+            _slidePage(state, const RouteSettingScreen()),
       ),
       GoRoute(
         path: AppRoutes.routePreview,
-        builder: (_, _) => const RoutePreviewScreen(),
+        pageBuilder: (ctx, state) =>
+            _slidePage(state, const RoutePreviewScreen()),
       ),
       GoRoute(
         path: AppRoutes.conditionPre,
-        builder: (_, _) => const ConditionScreen(timing: 'before'),
+        pageBuilder: (ctx, state) =>
+            _slidePage(state, const ConditionScreen(timing: 'before')),
       ),
       GoRoute(
         path: AppRoutes.activeRun,
-        builder: (_, _) => const ActiveRunScreen(),
+        pageBuilder: (ctx, state) =>
+            _slidePage(state, const ActiveRunScreen()),
       ),
       GoRoute(
         path: AppRoutes.runSummary,
-        builder: (_, state) => RunSummaryScreen(
-          sessionId: state.pathParameters['sessionId']!,
+        pageBuilder: (ctx, state) => _slidePage(
+          state,
+          RunSummaryScreen(
+            sessionId: state.pathParameters['sessionId']!,
+          ),
         ),
       ),
       GoRoute(
         path: AppRoutes.conditionPost,
-        builder: (_, _) => const ConditionScreen(timing: 'after'),
+        pageBuilder: (ctx, state) =>
+            _slidePage(state, const ConditionScreen(timing: 'after')),
       ),
     ],
 
@@ -153,3 +174,23 @@ final routerProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
+
+// ---------------------------------------------------------------------------
+// T-4.3.1: スライドトランジション（右から左、250ms、easeOutCubic）
+// ---------------------------------------------------------------------------
+
+CustomTransitionPage<void> _slidePage(GoRouterState state, Widget child) =>
+    CustomTransitionPage<void>(
+      key: state.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 250),
+      reverseTransitionDuration: const Duration(milliseconds: 200),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+          SlideTransition(
+            position: animation.drive(
+              Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
+                  .chain(CurveTween(curve: Curves.easeOutCubic)),
+            ),
+            child: child,
+          ),
+    );

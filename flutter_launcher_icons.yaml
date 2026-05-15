@@ -1,0 +1,35 @@
+# ---------------------------------------------------------------------------
+# T-5.1: アプリアイコン設定
+# ---------------------------------------------------------------------------
+# 使い方:
+#   1. 1024x1024 PNG の icon.png を assets/icon/ に配置する
+#   2. flutter pub run flutter_launcher_icons を実行する
+# ---------------------------------------------------------------------------
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+
+  # ---- アイコン画像パス（assets/icon/icon.png を作成してください）----
+  image_path: "assets/icon/icon.png"
+
+  # ---- Android 設定 ----
+  # Adaptive Icon（Android 8.0+）用
+  adaptive_icon_background: "#EAF4F4"   # ソフトテーマの surface 相当
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+
+  # Android 旧端末向けフォールバック
+  android_min_sdk: 21
+
+  # ---- iOS 設定 ----
+  # iOS は単一サイズ画像から全サイズを自動生成
+  remove_alpha_ios: true        # iOS は透過NG
+  min_ios_version: "16.0"
+
+# ---------------------------------------------------------------------------
+# 備考:
+# - icon.png: アプリアイコン（ウォーキングシルエット + パステルカラー推奨）
+# - icon_foreground.png: Adaptive Icon 前景（余白 72dp は "safe zone"）
+# - 実行後は android/app/src/main/res/mipmap-*/  と
+#   ios/Runner/Assets.xcassets/AppIcon.appiconset/ が自動生成される
+# ---------------------------------------------------------------------------

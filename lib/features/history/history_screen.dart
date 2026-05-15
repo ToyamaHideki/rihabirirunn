@@ -460,33 +460,44 @@ class _DayCell extends StatelessWidget {
       dotWidget = const SizedBox(width: 6, height: 8);
     }
 
-    return InkWell(
-      onTap: result != null ? onTap : null,
-      borderRadius: BorderRadius.circular(8),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isToday ? colorScheme.primary : null,
-            ),
-            child: Center(
-              child: Text(
-                '$day',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: textColor,
-                  fontWeight:
-                      isToday ? FontWeight.bold : FontWeight.normal,
+    // T-4.3.3: スクリーンリーダー向けラベル
+    String semanticLabel = '${date.month}月${date.day}日';
+    if (result != null) {
+      semanticLabel +=
+          result!.hasAchieved ? ' 目標達成 タップで記録を表示' : ' 走行・未達成 タップで記録を表示';
+    }
+
+    return Semantics(
+      label: semanticLabel,
+      button: result != null,
+      child: InkWell(
+        onTap: result != null ? onTap : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isToday ? colorScheme.primary : null,
+              ),
+              child: Center(
+                child: Text(
+                  '$day',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: textColor,
+                    fontWeight:
+                        isToday ? FontWeight.bold : FontWeight.normal,
+                  ),
                 ),
               ),
             ),
-          ),
-          dotWidget,
-        ],
+            dotWidget,
+          ],
+        ),
       ),
     );
   }
