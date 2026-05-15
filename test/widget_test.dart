@@ -8,6 +8,6 @@ void main() {
     await tester.pumpWidget(
       const ProviderScope(child: RihabiriRunApp()),
     );
-    expect(find.text('リハビリラン'), findsOneWidget);
+    expect(find.text('リハビリウォーク'), findsOneWidget);
   });
 }

@@ -48,7 +48,7 @@ class AppInfoScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'リハビリラン',
+                  'リハビリウォーク',
                   style: textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -76,7 +76,7 @@ class AppInfoScreen extends StatelessWidget {
                   Text('アプリについて', style: textTheme.labelLarge),
                   const SizedBox(height: 8),
                   Text(
-                    'リハビリランは、リハビリ中の方が無理なく歩行習慣を続けられるよう支援するアプリです。\n\n'
+                    'リハビリウォークは、リハビリ中の方が無理なく歩行習慣を続けられるよう支援するアプリです。\n\n'
                     '指定した距離に合わせたウォーキングルートを自動生成し、日々の走行記録・体調管理をサポートします。',
                     style: textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurface,
@@ -153,7 +153,7 @@ class AppInfoScreen extends StatelessWidget {
 
           Center(
             child: Text(
-              '© 2026 リハビリラン',
+              '© 2026 リハビリウォーク',
               style: textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),

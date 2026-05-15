@@ -216,7 +216,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         distanceFilter: 5, // T-2.1.1: 5m 移動ごとに更新
         // フォアグラウンドサービスで画面オフでも GPS 継続
         foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'リハビリラン',
+          notificationTitle: 'リハビリウォーク',
           notificationText: '走行中です',
           enableWakeLock: true,
           setOngoing: true,
@@ -321,7 +321,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
     if (!state.isActive) return;
     final statusLabel = state.isPaused ? '一時停止中' : '走行中';
     _notificationService.showRunningNotification(
-      title: 'リハビリラン  $statusLabel',
+      title: 'リハビリウォーク  $statusLabel',
       body:
           '${state.formattedDistance}  ／  ${state.formattedElapsed}'
           '  ｜  ペース ${state.formattedPace}',

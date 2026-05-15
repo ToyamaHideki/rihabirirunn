@@ -58,7 +58,7 @@ class HomeScreen extends ConsumerWidget {
           children: [
             Icon(Icons.directions_walk, color: colorScheme.primary, size: 24),
             const SizedBox(width: 8),
-            Text('リハビリラン', style: textTheme.titleLarge),
+            Text('リハビリウォーク', style: textTheme.titleLarge),
           ],
         ),
         centerTitle: false,

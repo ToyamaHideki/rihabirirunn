@@ -111,7 +111,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             Icon(Icons.directions_walk, size: 80, color: Colors.white),
             SizedBox(height: 16),
             Text(
-              'リハビリラン',
+              'リハビリウォーク',
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,

@@ -24,7 +24,7 @@ class RihabiriRunApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final theme = ref.watch(appThemeProvider);
     return MaterialApp.router(
-      title: 'リハビリラン',
+      title: 'リハビリウォーク',
       theme: theme,
       routerConfig: router,
     );

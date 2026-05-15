@@ -37,8 +37,8 @@ class DataExportService {
 
     await Share.shareXFiles(
       [XFile(file.path, mimeType: 'application/json')],
-      subject: 'リハビリランデータ',
-      text: 'リハビリランのバックアップデータです（v$_kAppVersion）',
+      subject: 'リハビリウォークデータ',
+      text: 'リハビリウォークのバックアップデータです（v$_kAppVersion）',
     );
   }
 
