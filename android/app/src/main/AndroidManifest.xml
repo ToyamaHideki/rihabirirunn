@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- ネットワーク（地図タイル取得に必要） -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- フォアグラウンドサービス（バックグラウンド GPS 追跡 T-2.1.5） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- 通知権限（Android 13+ 対応 T-2.1.6） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="rihabiri_run"
@@ -32,6 +37,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- geolocator フォアグラウンドサービス（T-2.1.5） -->
+        <service
+            android:name="com.baseflow.geolocator.GeolocatorService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

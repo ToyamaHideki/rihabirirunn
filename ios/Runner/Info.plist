@@ -10,6 +10,12 @@
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>バックグラウンドでもランニングルートを記録するためにGPSを使用します。</string>
 
+	<!-- バックグラウンド GPS 追跡（T-2.1.5） -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
