@@ -1,0 +1,86 @@
+# ---------------------------------------------------------------------------
+# T-5.7 / T-5.8: Codemagic CI/CD 設定
+# ---------------------------------------------------------------------------
+# セットアップ手順:
+#   1. https://codemagic.io/ でサインアップ
+#   2. GitHub リポジトリを接続
+#   3. App Store Connect API キー・Google Play サービスアカウントを登録
+#   4. 環境変数（下記 $変数）を Codemagic の Environment Variables に設定
+# ---------------------------------------------------------------------------
+
+workflows:
+
+  # --------------------------------------------------------------------------
+  # Android - Google Play 内部テスト（T-5.8）
+  # --------------------------------------------------------------------------
+  android-internal-test:
+    name: Android Internal Test
+    max_build_duration: 60
+    environment:
+      flutter: 3.41.9
+      java: 17
+      android_signing:
+        - keystore_reference  # Codemagic で登録するキーストア参照名
+      groups:
+        - google_play          # GCLOUD_SERVICE_ACCOUNT_CREDENTIALS を含むグループ
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Run analyze
+        script: flutter analyze
+      - name: Build Android release (appbundle)
+        script: |
+          flutter build appbundle \
+            --release \
+            --dart-define=MAPBOX_ACCESS_TOKEN=$MAPBOX_ACCESS_TOKEN
+    artifacts:
+      - build/**/outputs/**/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true
+
+  # --------------------------------------------------------------------------
+  # iOS - TestFlight（T-5.7）
+  # --------------------------------------------------------------------------
+  ios-testflight:
+    name: iOS TestFlight
+    max_build_duration: 90
+    environment:
+      flutter: 3.41.9
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: jp.rehabilirun.rihabiri_run
+      groups:
+        - app_store_connect     # APP_STORE_CONNECT_* 変数を含むグループ
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Run analyze
+        script: flutter analyze
+      - name: Build iOS release
+        script: |
+          flutter build ipa \
+            --release \
+            --dart-define=MAPBOX_ACCESS_TOKEN=$MAPBOX_ACCESS_TOKEN
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        # submit_to_app_store: false  # リリースビルド（T-5.9）時は true に変更
+
+# ---------------------------------------------------------------------------
+# 必要な環境変数（Codemagic の Environment Variables で設定）:
+#   MAPBOX_ACCESS_TOKEN     : Mapbox アクセストークン
+#   GCLOUD_SERVICE_ACCOUNT_CREDENTIALS : Google Play サービスアカウント JSON
+#   APP_STORE_CONNECT_PRIVATE_KEY      : App Store Connect API 秘密鍵
+#   APP_STORE_CONNECT_KEY_IDENTIFIER   : API キー ID
+#   APP_STORE_CONNECT_ISSUER_ID        : Issuer ID
+# ---------------------------------------------------------------------------
