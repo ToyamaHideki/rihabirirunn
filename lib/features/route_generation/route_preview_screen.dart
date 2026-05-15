@@ -196,10 +196,9 @@ class _RoutePreviewScreenState extends ConsumerState<RoutePreviewScreen> {
                   isRegenerating: _isRegenerating,
                   error: _error,
                   onRegenerate: _isRegenerating ? null : _regenerate,
-                  // T-2.2: activeRun へ計画ルート情報を extra で渡す
-                  // （conditionPre は T-2.3 実装時に再挿入予定）
+                  // T-3.1: conditionPre（走行前体調入力）を経由して activeRun へ
                   onStart: () =>
-                      context.push(AppRoutes.activeRun, extra: _args),
+                      context.push(AppRoutes.conditionPre, extra: _args),
                 ),
               ),
             ],

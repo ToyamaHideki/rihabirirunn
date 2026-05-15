@@ -329,11 +329,14 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
                   ),
                   const SizedBox(height: 28),
 
-                  // ホームへ
+                  // 走行後体調入力へ（T-3.1: conditionPost 経由でホームへ）
                   FilledButton.icon(
-                    icon: const Icon(Icons.home_rounded),
-                    label: const Text('ホームへ'),
-                    onPressed: () => context.go(AppRoutes.home),
+                    icon: const Icon(Icons.edit_note_rounded),
+                    label: const Text('体調を記録する'),
+                    onPressed: () => context.go(
+                      AppRoutes.conditionPost,
+                      extra: widget.sessionId,
+                    ),
                   ),
                 ],
               ),
