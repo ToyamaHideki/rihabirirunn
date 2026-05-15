@@ -29,6 +29,9 @@ abstract class AppRoutes {
   static const displaySettings = '/settings/display';
   static const dataManagement = '/settings/data';
   static const notificationSettings = '/settings/notifications';
+  static const termsOfService = '/settings/terms';
+  static const privacyPolicy = '/settings/privacy';
+  static const appInfo = '/settings/app-info';
 
   /// runSummary の実際のパスを生成
   static String runSummaryPath(String sessionId) =>

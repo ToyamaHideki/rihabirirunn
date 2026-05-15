@@ -15,12 +15,15 @@ import '../../features/onboarding/splash_screen.dart';
 import '../../features/result/run_summary_screen.dart';
 import '../../features/route_generation/route_preview_screen.dart';
 import '../../features/route_generation/route_setting_screen.dart';
+import '../../features/settings/app_info_screen.dart';
 import '../../features/settings/body_info_screen.dart';
 import '../../features/settings/data_management_screen.dart';
 import '../../features/settings/display_settings_screen.dart';
 import '../../features/settings/mode_settings_screen.dart';
 import '../../features/settings/notification_settings_screen.dart';
+import '../../features/settings/privacy_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/settings/terms_screen.dart';
 import '../widgets/main_shell.dart';
 import 'app_routes.dart';
 
@@ -97,6 +100,18 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'notifications',
                 builder: (_, _) => const NotificationSettingsScreen(),
+              ),
+              GoRoute(
+                path: 'terms',
+                builder: (_, _) => const TermsScreen(),
+              ),
+              GoRoute(
+                path: 'privacy',
+                builder: (_, _) => const PrivacyScreen(),
+              ),
+              GoRoute(
+                path: 'app-info',
+                builder: (_, _) => const AppInfoScreen(),
               ),
             ],
           ),
