@@ -24,6 +24,7 @@ import '../../features/settings/notification_settings_screen.dart';
 import '../../features/settings/privacy_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/settings/terms_screen.dart';
+import '../../features/settings/tracking_settings_screen.dart';
 import '../widgets/main_shell.dart';
 import 'app_routes.dart';
 
@@ -105,6 +106,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'data',
                 pageBuilder: (ctx, state) =>
                     _slidePage(state, const DataManagementScreen()),
+              ),
+              GoRoute(
+                path: 'tracking',
+                pageBuilder: (ctx, state) =>
+                    _slidePage(state, const TrackingSettingsScreen()),
               ),
               GoRoute(
                 path: 'notifications',

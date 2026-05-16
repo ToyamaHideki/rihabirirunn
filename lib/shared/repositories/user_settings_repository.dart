@@ -43,6 +43,7 @@ class UserSettingsRepository {
     bool? notificationEnabled,
     bool? streakAlertEnabled,
     bool? weatherAlertEnabled,
+    bool? gpsCorrectionEnabled,
   }) async {
     await (_db.update(_db.userSettings)..where((t) => t.id.equals(id))).write(
       UserSettingsCompanion(
@@ -59,6 +60,9 @@ class UserSettingsRepository {
             : const Value.absent(),
         weatherAlertEnabled: weatherAlertEnabled != null
             ? Value(weatherAlertEnabled)
+            : const Value.absent(),
+        gpsCorrectionEnabled: gpsCorrectionEnabled != null
+            ? Value(gpsCorrectionEnabled)
             : const Value.absent(),
         updatedAt: Value(DateTime.now()),
       ),

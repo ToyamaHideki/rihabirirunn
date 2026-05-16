@@ -7,6 +7,7 @@ import 'tables/condition_logs.dart';
 import 'tables/gps_points.dart';
 import 'tables/pain_areas.dart';
 import 'tables/run_sessions.dart';
+import 'tables/saved_routes.dart';
 import 'tables/user_profiles.dart';
 import 'tables/user_settings.dart';
 
@@ -20,6 +21,7 @@ part 'database.g.dart';
   GpsPoints,
   ConditionLogs,
   PainAreas,
+  SavedRoutes,
 ])
 class AppDatabase extends _$AppDatabase {
   /// [openDriftDatabase] はプラットフォームを自動判別する条件付きインポート。
@@ -27,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openDriftDatabase());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -61,9 +63,29 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX idx_gps_points_session_time '
           'ON gps_points(session_id, recorded_at ASC)',
         );
+
+        // 保存済みルート一覧（ユーザー単位、作成日降順）
+        await customStatement(
+          'CREATE INDEX idx_saved_routes_user_created '
+          'ON saved_routes(user_id, created_at DESC)',
+        );
       },
       onUpgrade: (m, from, to) async {
-        // 将来のマイグレーションはここに追加
+        // v1 → v2: user_settings.gps_correction_enabled カラム追加
+        if (from < 2) {
+          await m.addColumn(
+            userSettings,
+            userSettings.gpsCorrectionEnabled,
+          );
+        }
+        // v2 → v3: saved_routes テーブル追加
+        if (from < 3) {
+          await m.createTable(savedRoutes);
+          await customStatement(
+            'CREATE INDEX idx_saved_routes_user_created '
+            'ON saved_routes(user_id, created_at DESC)',
+          );
+        }
       },
     );
   }

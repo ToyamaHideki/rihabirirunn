@@ -698,6 +698,20 @@ class $UserSettingsTable extends UserSettings
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _gpsCorrectionEnabledMeta =
+      const VerificationMeta('gpsCorrectionEnabled');
+  @override
+  late final GeneratedColumn<bool> gpsCorrectionEnabled = GeneratedColumn<bool>(
+    'gps_correction_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("gps_correction_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -718,6 +732,7 @@ class $UserSettingsTable extends UserSettings
     notificationEnabled,
     streakAlertEnabled,
     weatherAlertEnabled,
+    gpsCorrectionEnabled,
     updatedAt,
   ];
   @override
@@ -787,6 +802,15 @@ class $UserSettingsTable extends UserSettings
         ),
       );
     }
+    if (data.containsKey('gps_correction_enabled')) {
+      context.handle(
+        _gpsCorrectionEnabledMeta,
+        gpsCorrectionEnabled.isAcceptableOrUnknown(
+          data['gps_correction_enabled']!,
+          _gpsCorrectionEnabledMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -832,6 +856,10 @@ class $UserSettingsTable extends UserSettings
         DriftSqlType.bool,
         data['${effectivePrefix}weather_alert_enabled'],
       )!,
+      gpsCorrectionEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}gps_correction_enabled'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -865,6 +893,12 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
 
   /// 天気警告通知（フェーズ2機能）
   final bool weatherAlertEnabled;
+
+  /// GPS 軌跡を Mapbox Map Matching API で道路にスナップするか
+  ///
+  /// true: 走行終了時に GPS 列を Map Matching に投げ、道路上に補正してから保存。
+  /// false: 生 GPS 座標をそのまま保存。
+  final bool gpsCorrectionEnabled;
   final DateTime updatedAt;
   const UserSetting({
     required this.id,
@@ -874,6 +908,7 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
     required this.notificationEnabled,
     required this.streakAlertEnabled,
     required this.weatherAlertEnabled,
+    required this.gpsCorrectionEnabled,
     required this.updatedAt,
   });
   @override
@@ -886,6 +921,7 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
     map['notification_enabled'] = Variable<bool>(notificationEnabled);
     map['streak_alert_enabled'] = Variable<bool>(streakAlertEnabled);
     map['weather_alert_enabled'] = Variable<bool>(weatherAlertEnabled);
+    map['gps_correction_enabled'] = Variable<bool>(gpsCorrectionEnabled);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -899,6 +935,7 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
       notificationEnabled: Value(notificationEnabled),
       streakAlertEnabled: Value(streakAlertEnabled),
       weatherAlertEnabled: Value(weatherAlertEnabled),
+      gpsCorrectionEnabled: Value(gpsCorrectionEnabled),
       updatedAt: Value(updatedAt),
     );
   }
@@ -920,6 +957,9 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
       weatherAlertEnabled: serializer.fromJson<bool>(
         json['weatherAlertEnabled'],
       ),
+      gpsCorrectionEnabled: serializer.fromJson<bool>(
+        json['gpsCorrectionEnabled'],
+      ),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -934,6 +974,7 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
       'notificationEnabled': serializer.toJson<bool>(notificationEnabled),
       'streakAlertEnabled': serializer.toJson<bool>(streakAlertEnabled),
       'weatherAlertEnabled': serializer.toJson<bool>(weatherAlertEnabled),
+      'gpsCorrectionEnabled': serializer.toJson<bool>(gpsCorrectionEnabled),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -946,6 +987,7 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
     bool? notificationEnabled,
     bool? streakAlertEnabled,
     bool? weatherAlertEnabled,
+    bool? gpsCorrectionEnabled,
     DateTime? updatedAt,
   }) => UserSetting(
     id: id ?? this.id,
@@ -955,6 +997,7 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
     notificationEnabled: notificationEnabled ?? this.notificationEnabled,
     streakAlertEnabled: streakAlertEnabled ?? this.streakAlertEnabled,
     weatherAlertEnabled: weatherAlertEnabled ?? this.weatherAlertEnabled,
+    gpsCorrectionEnabled: gpsCorrectionEnabled ?? this.gpsCorrectionEnabled,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   UserSetting copyWithCompanion(UserSettingsCompanion data) {
@@ -974,6 +1017,9 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
       weatherAlertEnabled: data.weatherAlertEnabled.present
           ? data.weatherAlertEnabled.value
           : this.weatherAlertEnabled,
+      gpsCorrectionEnabled: data.gpsCorrectionEnabled.present
+          ? data.gpsCorrectionEnabled.value
+          : this.gpsCorrectionEnabled,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -988,6 +1034,7 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
           ..write('notificationEnabled: $notificationEnabled, ')
           ..write('streakAlertEnabled: $streakAlertEnabled, ')
           ..write('weatherAlertEnabled: $weatherAlertEnabled, ')
+          ..write('gpsCorrectionEnabled: $gpsCorrectionEnabled, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -1002,6 +1049,7 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
     notificationEnabled,
     streakAlertEnabled,
     weatherAlertEnabled,
+    gpsCorrectionEnabled,
     updatedAt,
   );
   @override
@@ -1015,6 +1063,7 @@ class UserSetting extends DataClass implements Insertable<UserSetting> {
           other.notificationEnabled == this.notificationEnabled &&
           other.streakAlertEnabled == this.streakAlertEnabled &&
           other.weatherAlertEnabled == this.weatherAlertEnabled &&
+          other.gpsCorrectionEnabled == this.gpsCorrectionEnabled &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -1026,6 +1075,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSetting> {
   final Value<bool> notificationEnabled;
   final Value<bool> streakAlertEnabled;
   final Value<bool> weatherAlertEnabled;
+  final Value<bool> gpsCorrectionEnabled;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const UserSettingsCompanion({
@@ -1036,6 +1086,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSetting> {
     this.notificationEnabled = const Value.absent(),
     this.streakAlertEnabled = const Value.absent(),
     this.weatherAlertEnabled = const Value.absent(),
+    this.gpsCorrectionEnabled = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1047,6 +1098,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSetting> {
     this.notificationEnabled = const Value.absent(),
     this.streakAlertEnabled = const Value.absent(),
     this.weatherAlertEnabled = const Value.absent(),
+    this.gpsCorrectionEnabled = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1060,6 +1112,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSetting> {
     Expression<bool>? notificationEnabled,
     Expression<bool>? streakAlertEnabled,
     Expression<bool>? weatherAlertEnabled,
+    Expression<bool>? gpsCorrectionEnabled,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -1074,6 +1127,8 @@ class UserSettingsCompanion extends UpdateCompanion<UserSetting> {
         'streak_alert_enabled': streakAlertEnabled,
       if (weatherAlertEnabled != null)
         'weather_alert_enabled': weatherAlertEnabled,
+      if (gpsCorrectionEnabled != null)
+        'gps_correction_enabled': gpsCorrectionEnabled,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1087,6 +1142,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSetting> {
     Value<bool>? notificationEnabled,
     Value<bool>? streakAlertEnabled,
     Value<bool>? weatherAlertEnabled,
+    Value<bool>? gpsCorrectionEnabled,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -1098,6 +1154,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSetting> {
       notificationEnabled: notificationEnabled ?? this.notificationEnabled,
       streakAlertEnabled: streakAlertEnabled ?? this.streakAlertEnabled,
       weatherAlertEnabled: weatherAlertEnabled ?? this.weatherAlertEnabled,
+      gpsCorrectionEnabled: gpsCorrectionEnabled ?? this.gpsCorrectionEnabled,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1127,6 +1184,11 @@ class UserSettingsCompanion extends UpdateCompanion<UserSetting> {
     if (weatherAlertEnabled.present) {
       map['weather_alert_enabled'] = Variable<bool>(weatherAlertEnabled.value);
     }
+    if (gpsCorrectionEnabled.present) {
+      map['gps_correction_enabled'] = Variable<bool>(
+        gpsCorrectionEnabled.value,
+      );
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -1146,6 +1208,7 @@ class UserSettingsCompanion extends UpdateCompanion<UserSetting> {
           ..write('notificationEnabled: $notificationEnabled, ')
           ..write('streakAlertEnabled: $streakAlertEnabled, ')
           ..write('weatherAlertEnabled: $weatherAlertEnabled, ')
+          ..write('gpsCorrectionEnabled: $gpsCorrectionEnabled, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3527,6 +3590,936 @@ class PainAreasCompanion extends UpdateCompanion<PainArea> {
   }
 }
 
+class $SavedRoutesTable extends SavedRoutes
+    with TableInfo<$SavedRoutesTable, SavedRoute> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SavedRoutesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES user_profiles (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _targetDistanceMMeta = const VerificationMeta(
+    'targetDistanceM',
+  );
+  @override
+  late final GeneratedColumn<double> targetDistanceM = GeneratedColumn<double>(
+    'target_distance_m',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _actualDistanceMMeta = const VerificationMeta(
+    'actualDistanceM',
+  );
+  @override
+  late final GeneratedColumn<double> actualDistanceM = GeneratedColumn<double>(
+    'actual_distance_m',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _durationSecondsMeta = const VerificationMeta(
+    'durationSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> durationSeconds = GeneratedColumn<int>(
+    'duration_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _routeTypeMeta = const VerificationMeta(
+    'routeType',
+  );
+  @override
+  late final GeneratedColumn<String> routeType = GeneratedColumn<String>(
+    'route_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _polylineJsonMeta = const VerificationMeta(
+    'polylineJson',
+  );
+  @override
+  late final GeneratedColumn<String> polylineJson = GeneratedColumn<String>(
+    'polyline_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _departureLatMeta = const VerificationMeta(
+    'departureLat',
+  );
+  @override
+  late final GeneratedColumn<double> departureLat = GeneratedColumn<double>(
+    'departure_lat',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _departureLngMeta = const VerificationMeta(
+    'departureLng',
+  );
+  @override
+  late final GeneratedColumn<double> departureLng = GeneratedColumn<double>(
+    'departure_lng',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _destinationLatMeta = const VerificationMeta(
+    'destinationLat',
+  );
+  @override
+  late final GeneratedColumn<double> destinationLat = GeneratedColumn<double>(
+    'destination_lat',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _destinationLngMeta = const VerificationMeta(
+    'destinationLng',
+  );
+  @override
+  late final GeneratedColumn<double> destinationLng = GeneratedColumn<double>(
+    'destination_lng',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isFavoriteMeta = const VerificationMeta(
+    'isFavorite',
+  );
+  @override
+  late final GeneratedColumn<bool> isFavorite = GeneratedColumn<bool>(
+    'is_favorite',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_favorite" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastUsedAtMeta = const VerificationMeta(
+    'lastUsedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastUsedAt = GeneratedColumn<DateTime>(
+    'last_used_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    userId,
+    name,
+    targetDistanceM,
+    actualDistanceM,
+    durationSeconds,
+    routeType,
+    polylineJson,
+    departureLat,
+    departureLng,
+    destinationLat,
+    destinationLng,
+    isFavorite,
+    createdAt,
+    lastUsedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'saved_routes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SavedRoute> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    }
+    if (data.containsKey('target_distance_m')) {
+      context.handle(
+        _targetDistanceMMeta,
+        targetDistanceM.isAcceptableOrUnknown(
+          data['target_distance_m']!,
+          _targetDistanceMMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_targetDistanceMMeta);
+    }
+    if (data.containsKey('actual_distance_m')) {
+      context.handle(
+        _actualDistanceMMeta,
+        actualDistanceM.isAcceptableOrUnknown(
+          data['actual_distance_m']!,
+          _actualDistanceMMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_actualDistanceMMeta);
+    }
+    if (data.containsKey('duration_seconds')) {
+      context.handle(
+        _durationSecondsMeta,
+        durationSeconds.isAcceptableOrUnknown(
+          data['duration_seconds']!,
+          _durationSecondsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_durationSecondsMeta);
+    }
+    if (data.containsKey('route_type')) {
+      context.handle(
+        _routeTypeMeta,
+        routeType.isAcceptableOrUnknown(data['route_type']!, _routeTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_routeTypeMeta);
+    }
+    if (data.containsKey('polyline_json')) {
+      context.handle(
+        _polylineJsonMeta,
+        polylineJson.isAcceptableOrUnknown(
+          data['polyline_json']!,
+          _polylineJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_polylineJsonMeta);
+    }
+    if (data.containsKey('departure_lat')) {
+      context.handle(
+        _departureLatMeta,
+        departureLat.isAcceptableOrUnknown(
+          data['departure_lat']!,
+          _departureLatMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_departureLatMeta);
+    }
+    if (data.containsKey('departure_lng')) {
+      context.handle(
+        _departureLngMeta,
+        departureLng.isAcceptableOrUnknown(
+          data['departure_lng']!,
+          _departureLngMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_departureLngMeta);
+    }
+    if (data.containsKey('destination_lat')) {
+      context.handle(
+        _destinationLatMeta,
+        destinationLat.isAcceptableOrUnknown(
+          data['destination_lat']!,
+          _destinationLatMeta,
+        ),
+      );
+    }
+    if (data.containsKey('destination_lng')) {
+      context.handle(
+        _destinationLngMeta,
+        destinationLng.isAcceptableOrUnknown(
+          data['destination_lng']!,
+          _destinationLngMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_favorite')) {
+      context.handle(
+        _isFavoriteMeta,
+        isFavorite.isAcceptableOrUnknown(data['is_favorite']!, _isFavoriteMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('last_used_at')) {
+      context.handle(
+        _lastUsedAtMeta,
+        lastUsedAt.isAcceptableOrUnknown(
+          data['last_used_at']!,
+          _lastUsedAtMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SavedRoute map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SavedRoute(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      targetDistanceM: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}target_distance_m'],
+      )!,
+      actualDistanceM: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}actual_distance_m'],
+      )!,
+      durationSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_seconds'],
+      )!,
+      routeType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}route_type'],
+      )!,
+      polylineJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}polyline_json'],
+      )!,
+      departureLat: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}departure_lat'],
+      )!,
+      departureLng: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}departure_lng'],
+      )!,
+      destinationLat: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}destination_lat'],
+      ),
+      destinationLng: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}destination_lng'],
+      ),
+      isFavorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_favorite'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      lastUsedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_used_at'],
+      ),
+    );
+  }
+
+  @override
+  $SavedRoutesTable createAlias(String alias) {
+    return $SavedRoutesTable(attachedDatabase, alias);
+  }
+}
+
+class SavedRoute extends DataClass implements Insertable<SavedRoute> {
+  final String id;
+
+  /// UserProfiles FK
+  final String userId;
+
+  /// 任意のルート名（ユーザーが付ける）。未設定時は出発地点座標等から生成される。
+  final String name;
+
+  /// 目標距離（m）— ユーザーがスライダーで指定した値
+  final double targetDistanceM;
+
+  /// 実際の距離（m）— Mapbox から取得した実ルート距離
+  final double actualDistanceM;
+
+  /// 推定所要時間（秒）
+  final int durationSeconds;
+
+  /// ルート種別: circular / oneWay
+  final String routeType;
+
+  /// ルートの座標列を JSON 文字列で保存
+  ///
+  /// 形式: `[[lat, lng], [lat, lng], ...]`
+  final String polylineJson;
+
+  /// 出発地点緯度
+  final double departureLat;
+
+  /// 出発地点経度
+  final double departureLng;
+
+  /// 目的地点緯度（片道で指定された場合のみ）
+  final double? destinationLat;
+
+  /// 目的地点経度（片道で指定された場合のみ）
+  final double? destinationLng;
+
+  /// お気に入りフラグ
+  final bool isFavorite;
+
+  /// 作成日時
+  final DateTime createdAt;
+
+  /// 最終使用日時（走行開始時に更新）
+  final DateTime? lastUsedAt;
+  const SavedRoute({
+    required this.id,
+    required this.userId,
+    required this.name,
+    required this.targetDistanceM,
+    required this.actualDistanceM,
+    required this.durationSeconds,
+    required this.routeType,
+    required this.polylineJson,
+    required this.departureLat,
+    required this.departureLng,
+    this.destinationLat,
+    this.destinationLng,
+    required this.isFavorite,
+    required this.createdAt,
+    this.lastUsedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['user_id'] = Variable<String>(userId);
+    map['name'] = Variable<String>(name);
+    map['target_distance_m'] = Variable<double>(targetDistanceM);
+    map['actual_distance_m'] = Variable<double>(actualDistanceM);
+    map['duration_seconds'] = Variable<int>(durationSeconds);
+    map['route_type'] = Variable<String>(routeType);
+    map['polyline_json'] = Variable<String>(polylineJson);
+    map['departure_lat'] = Variable<double>(departureLat);
+    map['departure_lng'] = Variable<double>(departureLng);
+    if (!nullToAbsent || destinationLat != null) {
+      map['destination_lat'] = Variable<double>(destinationLat);
+    }
+    if (!nullToAbsent || destinationLng != null) {
+      map['destination_lng'] = Variable<double>(destinationLng);
+    }
+    map['is_favorite'] = Variable<bool>(isFavorite);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || lastUsedAt != null) {
+      map['last_used_at'] = Variable<DateTime>(lastUsedAt);
+    }
+    return map;
+  }
+
+  SavedRoutesCompanion toCompanion(bool nullToAbsent) {
+    return SavedRoutesCompanion(
+      id: Value(id),
+      userId: Value(userId),
+      name: Value(name),
+      targetDistanceM: Value(targetDistanceM),
+      actualDistanceM: Value(actualDistanceM),
+      durationSeconds: Value(durationSeconds),
+      routeType: Value(routeType),
+      polylineJson: Value(polylineJson),
+      departureLat: Value(departureLat),
+      departureLng: Value(departureLng),
+      destinationLat: destinationLat == null && nullToAbsent
+          ? const Value.absent()
+          : Value(destinationLat),
+      destinationLng: destinationLng == null && nullToAbsent
+          ? const Value.absent()
+          : Value(destinationLng),
+      isFavorite: Value(isFavorite),
+      createdAt: Value(createdAt),
+      lastUsedAt: lastUsedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastUsedAt),
+    );
+  }
+
+  factory SavedRoute.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SavedRoute(
+      id: serializer.fromJson<String>(json['id']),
+      userId: serializer.fromJson<String>(json['userId']),
+      name: serializer.fromJson<String>(json['name']),
+      targetDistanceM: serializer.fromJson<double>(json['targetDistanceM']),
+      actualDistanceM: serializer.fromJson<double>(json['actualDistanceM']),
+      durationSeconds: serializer.fromJson<int>(json['durationSeconds']),
+      routeType: serializer.fromJson<String>(json['routeType']),
+      polylineJson: serializer.fromJson<String>(json['polylineJson']),
+      departureLat: serializer.fromJson<double>(json['departureLat']),
+      departureLng: serializer.fromJson<double>(json['departureLng']),
+      destinationLat: serializer.fromJson<double?>(json['destinationLat']),
+      destinationLng: serializer.fromJson<double?>(json['destinationLng']),
+      isFavorite: serializer.fromJson<bool>(json['isFavorite']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastUsedAt: serializer.fromJson<DateTime?>(json['lastUsedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'userId': serializer.toJson<String>(userId),
+      'name': serializer.toJson<String>(name),
+      'targetDistanceM': serializer.toJson<double>(targetDistanceM),
+      'actualDistanceM': serializer.toJson<double>(actualDistanceM),
+      'durationSeconds': serializer.toJson<int>(durationSeconds),
+      'routeType': serializer.toJson<String>(routeType),
+      'polylineJson': serializer.toJson<String>(polylineJson),
+      'departureLat': serializer.toJson<double>(departureLat),
+      'departureLng': serializer.toJson<double>(departureLng),
+      'destinationLat': serializer.toJson<double?>(destinationLat),
+      'destinationLng': serializer.toJson<double?>(destinationLng),
+      'isFavorite': serializer.toJson<bool>(isFavorite),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastUsedAt': serializer.toJson<DateTime?>(lastUsedAt),
+    };
+  }
+
+  SavedRoute copyWith({
+    String? id,
+    String? userId,
+    String? name,
+    double? targetDistanceM,
+    double? actualDistanceM,
+    int? durationSeconds,
+    String? routeType,
+    String? polylineJson,
+    double? departureLat,
+    double? departureLng,
+    Value<double?> destinationLat = const Value.absent(),
+    Value<double?> destinationLng = const Value.absent(),
+    bool? isFavorite,
+    DateTime? createdAt,
+    Value<DateTime?> lastUsedAt = const Value.absent(),
+  }) => SavedRoute(
+    id: id ?? this.id,
+    userId: userId ?? this.userId,
+    name: name ?? this.name,
+    targetDistanceM: targetDistanceM ?? this.targetDistanceM,
+    actualDistanceM: actualDistanceM ?? this.actualDistanceM,
+    durationSeconds: durationSeconds ?? this.durationSeconds,
+    routeType: routeType ?? this.routeType,
+    polylineJson: polylineJson ?? this.polylineJson,
+    departureLat: departureLat ?? this.departureLat,
+    departureLng: departureLng ?? this.departureLng,
+    destinationLat: destinationLat.present
+        ? destinationLat.value
+        : this.destinationLat,
+    destinationLng: destinationLng.present
+        ? destinationLng.value
+        : this.destinationLng,
+    isFavorite: isFavorite ?? this.isFavorite,
+    createdAt: createdAt ?? this.createdAt,
+    lastUsedAt: lastUsedAt.present ? lastUsedAt.value : this.lastUsedAt,
+  );
+  SavedRoute copyWithCompanion(SavedRoutesCompanion data) {
+    return SavedRoute(
+      id: data.id.present ? data.id.value : this.id,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      name: data.name.present ? data.name.value : this.name,
+      targetDistanceM: data.targetDistanceM.present
+          ? data.targetDistanceM.value
+          : this.targetDistanceM,
+      actualDistanceM: data.actualDistanceM.present
+          ? data.actualDistanceM.value
+          : this.actualDistanceM,
+      durationSeconds: data.durationSeconds.present
+          ? data.durationSeconds.value
+          : this.durationSeconds,
+      routeType: data.routeType.present ? data.routeType.value : this.routeType,
+      polylineJson: data.polylineJson.present
+          ? data.polylineJson.value
+          : this.polylineJson,
+      departureLat: data.departureLat.present
+          ? data.departureLat.value
+          : this.departureLat,
+      departureLng: data.departureLng.present
+          ? data.departureLng.value
+          : this.departureLng,
+      destinationLat: data.destinationLat.present
+          ? data.destinationLat.value
+          : this.destinationLat,
+      destinationLng: data.destinationLng.present
+          ? data.destinationLng.value
+          : this.destinationLng,
+      isFavorite: data.isFavorite.present
+          ? data.isFavorite.value
+          : this.isFavorite,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastUsedAt: data.lastUsedAt.present
+          ? data.lastUsedAt.value
+          : this.lastUsedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SavedRoute(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('name: $name, ')
+          ..write('targetDistanceM: $targetDistanceM, ')
+          ..write('actualDistanceM: $actualDistanceM, ')
+          ..write('durationSeconds: $durationSeconds, ')
+          ..write('routeType: $routeType, ')
+          ..write('polylineJson: $polylineJson, ')
+          ..write('departureLat: $departureLat, ')
+          ..write('departureLng: $departureLng, ')
+          ..write('destinationLat: $destinationLat, ')
+          ..write('destinationLng: $destinationLng, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastUsedAt: $lastUsedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    userId,
+    name,
+    targetDistanceM,
+    actualDistanceM,
+    durationSeconds,
+    routeType,
+    polylineJson,
+    departureLat,
+    departureLng,
+    destinationLat,
+    destinationLng,
+    isFavorite,
+    createdAt,
+    lastUsedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SavedRoute &&
+          other.id == this.id &&
+          other.userId == this.userId &&
+          other.name == this.name &&
+          other.targetDistanceM == this.targetDistanceM &&
+          other.actualDistanceM == this.actualDistanceM &&
+          other.durationSeconds == this.durationSeconds &&
+          other.routeType == this.routeType &&
+          other.polylineJson == this.polylineJson &&
+          other.departureLat == this.departureLat &&
+          other.departureLng == this.departureLng &&
+          other.destinationLat == this.destinationLat &&
+          other.destinationLng == this.destinationLng &&
+          other.isFavorite == this.isFavorite &&
+          other.createdAt == this.createdAt &&
+          other.lastUsedAt == this.lastUsedAt);
+}
+
+class SavedRoutesCompanion extends UpdateCompanion<SavedRoute> {
+  final Value<String> id;
+  final Value<String> userId;
+  final Value<String> name;
+  final Value<double> targetDistanceM;
+  final Value<double> actualDistanceM;
+  final Value<int> durationSeconds;
+  final Value<String> routeType;
+  final Value<String> polylineJson;
+  final Value<double> departureLat;
+  final Value<double> departureLng;
+  final Value<double?> destinationLat;
+  final Value<double?> destinationLng;
+  final Value<bool> isFavorite;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> lastUsedAt;
+  final Value<int> rowid;
+  const SavedRoutesCompanion({
+    this.id = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.targetDistanceM = const Value.absent(),
+    this.actualDistanceM = const Value.absent(),
+    this.durationSeconds = const Value.absent(),
+    this.routeType = const Value.absent(),
+    this.polylineJson = const Value.absent(),
+    this.departureLat = const Value.absent(),
+    this.departureLng = const Value.absent(),
+    this.destinationLat = const Value.absent(),
+    this.destinationLng = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastUsedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SavedRoutesCompanion.insert({
+    required String id,
+    required String userId,
+    this.name = const Value.absent(),
+    required double targetDistanceM,
+    required double actualDistanceM,
+    required int durationSeconds,
+    required String routeType,
+    required String polylineJson,
+    required double departureLat,
+    required double departureLng,
+    this.destinationLat = const Value.absent(),
+    this.destinationLng = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    required DateTime createdAt,
+    this.lastUsedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       userId = Value(userId),
+       targetDistanceM = Value(targetDistanceM),
+       actualDistanceM = Value(actualDistanceM),
+       durationSeconds = Value(durationSeconds),
+       routeType = Value(routeType),
+       polylineJson = Value(polylineJson),
+       departureLat = Value(departureLat),
+       departureLng = Value(departureLng),
+       createdAt = Value(createdAt);
+  static Insertable<SavedRoute> custom({
+    Expression<String>? id,
+    Expression<String>? userId,
+    Expression<String>? name,
+    Expression<double>? targetDistanceM,
+    Expression<double>? actualDistanceM,
+    Expression<int>? durationSeconds,
+    Expression<String>? routeType,
+    Expression<String>? polylineJson,
+    Expression<double>? departureLat,
+    Expression<double>? departureLng,
+    Expression<double>? destinationLat,
+    Expression<double>? destinationLng,
+    Expression<bool>? isFavorite,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? lastUsedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (userId != null) 'user_id': userId,
+      if (name != null) 'name': name,
+      if (targetDistanceM != null) 'target_distance_m': targetDistanceM,
+      if (actualDistanceM != null) 'actual_distance_m': actualDistanceM,
+      if (durationSeconds != null) 'duration_seconds': durationSeconds,
+      if (routeType != null) 'route_type': routeType,
+      if (polylineJson != null) 'polyline_json': polylineJson,
+      if (departureLat != null) 'departure_lat': departureLat,
+      if (departureLng != null) 'departure_lng': departureLng,
+      if (destinationLat != null) 'destination_lat': destinationLat,
+      if (destinationLng != null) 'destination_lng': destinationLng,
+      if (isFavorite != null) 'is_favorite': isFavorite,
+      if (createdAt != null) 'created_at': createdAt,
+      if (lastUsedAt != null) 'last_used_at': lastUsedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SavedRoutesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? userId,
+    Value<String>? name,
+    Value<double>? targetDistanceM,
+    Value<double>? actualDistanceM,
+    Value<int>? durationSeconds,
+    Value<String>? routeType,
+    Value<String>? polylineJson,
+    Value<double>? departureLat,
+    Value<double>? departureLng,
+    Value<double?>? destinationLat,
+    Value<double?>? destinationLng,
+    Value<bool>? isFavorite,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? lastUsedAt,
+    Value<int>? rowid,
+  }) {
+    return SavedRoutesCompanion(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      name: name ?? this.name,
+      targetDistanceM: targetDistanceM ?? this.targetDistanceM,
+      actualDistanceM: actualDistanceM ?? this.actualDistanceM,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      routeType: routeType ?? this.routeType,
+      polylineJson: polylineJson ?? this.polylineJson,
+      departureLat: departureLat ?? this.departureLat,
+      departureLng: departureLng ?? this.departureLng,
+      destinationLat: destinationLat ?? this.destinationLat,
+      destinationLng: destinationLng ?? this.destinationLng,
+      isFavorite: isFavorite ?? this.isFavorite,
+      createdAt: createdAt ?? this.createdAt,
+      lastUsedAt: lastUsedAt ?? this.lastUsedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (targetDistanceM.present) {
+      map['target_distance_m'] = Variable<double>(targetDistanceM.value);
+    }
+    if (actualDistanceM.present) {
+      map['actual_distance_m'] = Variable<double>(actualDistanceM.value);
+    }
+    if (durationSeconds.present) {
+      map['duration_seconds'] = Variable<int>(durationSeconds.value);
+    }
+    if (routeType.present) {
+      map['route_type'] = Variable<String>(routeType.value);
+    }
+    if (polylineJson.present) {
+      map['polyline_json'] = Variable<String>(polylineJson.value);
+    }
+    if (departureLat.present) {
+      map['departure_lat'] = Variable<double>(departureLat.value);
+    }
+    if (departureLng.present) {
+      map['departure_lng'] = Variable<double>(departureLng.value);
+    }
+    if (destinationLat.present) {
+      map['destination_lat'] = Variable<double>(destinationLat.value);
+    }
+    if (destinationLng.present) {
+      map['destination_lng'] = Variable<double>(destinationLng.value);
+    }
+    if (isFavorite.present) {
+      map['is_favorite'] = Variable<bool>(isFavorite.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (lastUsedAt.present) {
+      map['last_used_at'] = Variable<DateTime>(lastUsedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SavedRoutesCompanion(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('name: $name, ')
+          ..write('targetDistanceM: $targetDistanceM, ')
+          ..write('actualDistanceM: $actualDistanceM, ')
+          ..write('durationSeconds: $durationSeconds, ')
+          ..write('routeType: $routeType, ')
+          ..write('polylineJson: $polylineJson, ')
+          ..write('departureLat: $departureLat, ')
+          ..write('departureLng: $departureLng, ')
+          ..write('destinationLat: $destinationLat, ')
+          ..write('destinationLng: $destinationLng, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastUsedAt: $lastUsedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3536,6 +4529,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $GpsPointsTable gpsPoints = $GpsPointsTable(this);
   late final $ConditionLogsTable conditionLogs = $ConditionLogsTable(this);
   late final $PainAreasTable painAreas = $PainAreasTable(this);
+  late final $SavedRoutesTable savedRoutes = $SavedRoutesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3547,6 +4541,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     gpsPoints,
     conditionLogs,
     painAreas,
+    savedRoutes,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -3591,6 +4586,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('pain_areas', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'user_profiles',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('saved_routes', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -3678,6 +4680,24 @@ final class $$UserProfilesTableReferences
     ).filter((f) => f.userId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_conditionLogsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$SavedRoutesTable, List<SavedRoute>>
+  _savedRoutesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.savedRoutes,
+    aliasName: $_aliasNameGenerator(db.userProfiles.id, db.savedRoutes.userId),
+  );
+
+  $$SavedRoutesTableProcessedTableManager get savedRoutesRefs {
+    final manager = $$SavedRoutesTableTableManager(
+      $_db,
+      $_db.savedRoutes,
+    ).filter((f) => f.userId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_savedRoutesRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -3804,6 +4824,31 @@ class $$UserProfilesTableFilterComposer
           }) => $$ConditionLogsTableFilterComposer(
             $db: $db,
             $table: $db.conditionLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> savedRoutesRefs(
+    Expression<bool> Function($$SavedRoutesTableFilterComposer f) f,
+  ) {
+    final $$SavedRoutesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.savedRoutes,
+      getReferencedColumn: (t) => t.userId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SavedRoutesTableFilterComposer(
+            $db: $db,
+            $table: $db.savedRoutes,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -3987,6 +5032,31 @@ class $$UserProfilesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> savedRoutesRefs<T extends Object>(
+    Expression<T> Function($$SavedRoutesTableAnnotationComposer a) f,
+  ) {
+    final $$SavedRoutesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.savedRoutes,
+      getReferencedColumn: (t) => t.userId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SavedRoutesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.savedRoutes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$UserProfilesTableTableManager
@@ -4006,6 +5076,7 @@ class $$UserProfilesTableTableManager
             bool userSettingsRefs,
             bool runSessionsRefs,
             bool conditionLogsRefs,
+            bool savedRoutesRefs,
           })
         > {
   $$UserProfilesTableTableManager(_$AppDatabase db, $UserProfilesTable table)
@@ -4080,6 +5151,7 @@ class $$UserProfilesTableTableManager
                 userSettingsRefs = false,
                 runSessionsRefs = false,
                 conditionLogsRefs = false,
+                savedRoutesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -4087,6 +5159,7 @@ class $$UserProfilesTableTableManager
                     if (userSettingsRefs) db.userSettings,
                     if (runSessionsRefs) db.runSessions,
                     if (conditionLogsRefs) db.conditionLogs,
+                    if (savedRoutesRefs) db.savedRoutes,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -4154,6 +5227,27 @@ class $$UserProfilesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (savedRoutesRefs)
+                        await $_getPrefetchedData<
+                          UserProfile,
+                          $UserProfilesTable,
+                          SavedRoute
+                        >(
+                          currentTable: table,
+                          referencedTable: $$UserProfilesTableReferences
+                              ._savedRoutesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$UserProfilesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).savedRoutesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.userId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -4178,6 +5272,7 @@ typedef $$UserProfilesTableProcessedTableManager =
         bool userSettingsRefs,
         bool runSessionsRefs,
         bool conditionLogsRefs,
+        bool savedRoutesRefs,
       })
     >;
 typedef $$UserSettingsTableCreateCompanionBuilder =
@@ -4189,6 +5284,7 @@ typedef $$UserSettingsTableCreateCompanionBuilder =
       Value<bool> notificationEnabled,
       Value<bool> streakAlertEnabled,
       Value<bool> weatherAlertEnabled,
+      Value<bool> gpsCorrectionEnabled,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -4201,6 +5297,7 @@ typedef $$UserSettingsTableUpdateCompanionBuilder =
       Value<bool> notificationEnabled,
       Value<bool> streakAlertEnabled,
       Value<bool> weatherAlertEnabled,
+      Value<bool> gpsCorrectionEnabled,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -4265,6 +5362,11 @@ class $$UserSettingsTableFilterComposer
 
   ColumnFilters<bool> get weatherAlertEnabled => $composableBuilder(
     column: $table.weatherAlertEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get gpsCorrectionEnabled => $composableBuilder(
+    column: $table.gpsCorrectionEnabled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4336,6 +5438,11 @@ class $$UserSettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get gpsCorrectionEnabled => $composableBuilder(
+    column: $table.gpsCorrectionEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -4397,6 +5504,11 @@ class $$UserSettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get weatherAlertEnabled => $composableBuilder(
     column: $table.weatherAlertEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get gpsCorrectionEnabled => $composableBuilder(
+    column: $table.gpsCorrectionEnabled,
     builder: (column) => column,
   );
 
@@ -4462,6 +5574,7 @@ class $$UserSettingsTableTableManager
                 Value<bool> notificationEnabled = const Value.absent(),
                 Value<bool> streakAlertEnabled = const Value.absent(),
                 Value<bool> weatherAlertEnabled = const Value.absent(),
+                Value<bool> gpsCorrectionEnabled = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => UserSettingsCompanion(
@@ -4472,6 +5585,7 @@ class $$UserSettingsTableTableManager
                 notificationEnabled: notificationEnabled,
                 streakAlertEnabled: streakAlertEnabled,
                 weatherAlertEnabled: weatherAlertEnabled,
+                gpsCorrectionEnabled: gpsCorrectionEnabled,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -4484,6 +5598,7 @@ class $$UserSettingsTableTableManager
                 Value<bool> notificationEnabled = const Value.absent(),
                 Value<bool> streakAlertEnabled = const Value.absent(),
                 Value<bool> weatherAlertEnabled = const Value.absent(),
+                Value<bool> gpsCorrectionEnabled = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => UserSettingsCompanion.insert(
@@ -4494,6 +5609,7 @@ class $$UserSettingsTableTableManager
                 notificationEnabled: notificationEnabled,
                 streakAlertEnabled: streakAlertEnabled,
                 weatherAlertEnabled: weatherAlertEnabled,
+                gpsCorrectionEnabled: gpsCorrectionEnabled,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -6577,6 +7693,535 @@ typedef $$PainAreasTableProcessedTableManager =
       PainArea,
       PrefetchHooks Function({bool conditionLogId})
     >;
+typedef $$SavedRoutesTableCreateCompanionBuilder =
+    SavedRoutesCompanion Function({
+      required String id,
+      required String userId,
+      Value<String> name,
+      required double targetDistanceM,
+      required double actualDistanceM,
+      required int durationSeconds,
+      required String routeType,
+      required String polylineJson,
+      required double departureLat,
+      required double departureLng,
+      Value<double?> destinationLat,
+      Value<double?> destinationLng,
+      Value<bool> isFavorite,
+      required DateTime createdAt,
+      Value<DateTime?> lastUsedAt,
+      Value<int> rowid,
+    });
+typedef $$SavedRoutesTableUpdateCompanionBuilder =
+    SavedRoutesCompanion Function({
+      Value<String> id,
+      Value<String> userId,
+      Value<String> name,
+      Value<double> targetDistanceM,
+      Value<double> actualDistanceM,
+      Value<int> durationSeconds,
+      Value<String> routeType,
+      Value<String> polylineJson,
+      Value<double> departureLat,
+      Value<double> departureLng,
+      Value<double?> destinationLat,
+      Value<double?> destinationLng,
+      Value<bool> isFavorite,
+      Value<DateTime> createdAt,
+      Value<DateTime?> lastUsedAt,
+      Value<int> rowid,
+    });
+
+final class $$SavedRoutesTableReferences
+    extends BaseReferences<_$AppDatabase, $SavedRoutesTable, SavedRoute> {
+  $$SavedRoutesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $UserProfilesTable _userIdTable(_$AppDatabase db) =>
+      db.userProfiles.createAlias(
+        $_aliasNameGenerator(db.savedRoutes.userId, db.userProfiles.id),
+      );
+
+  $$UserProfilesTableProcessedTableManager get userId {
+    final $_column = $_itemColumn<String>('user_id')!;
+
+    final manager = $$UserProfilesTableTableManager(
+      $_db,
+      $_db.userProfiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_userIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$SavedRoutesTableFilterComposer
+    extends Composer<_$AppDatabase, $SavedRoutesTable> {
+  $$SavedRoutesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get targetDistanceM => $composableBuilder(
+    column: $table.targetDistanceM,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get actualDistanceM => $composableBuilder(
+    column: $table.actualDistanceM,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get routeType => $composableBuilder(
+    column: $table.routeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get polylineJson => $composableBuilder(
+    column: $table.polylineJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get departureLat => $composableBuilder(
+    column: $table.departureLat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get departureLng => $composableBuilder(
+    column: $table.departureLng,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get destinationLat => $composableBuilder(
+    column: $table.destinationLat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get destinationLng => $composableBuilder(
+    column: $table.destinationLng,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastUsedAt => $composableBuilder(
+    column: $table.lastUsedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$UserProfilesTableFilterComposer get userId {
+    final $$UserProfilesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.userProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UserProfilesTableFilterComposer(
+            $db: $db,
+            $table: $db.userProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SavedRoutesTableOrderingComposer
+    extends Composer<_$AppDatabase, $SavedRoutesTable> {
+  $$SavedRoutesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get targetDistanceM => $composableBuilder(
+    column: $table.targetDistanceM,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get actualDistanceM => $composableBuilder(
+    column: $table.actualDistanceM,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get routeType => $composableBuilder(
+    column: $table.routeType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get polylineJson => $composableBuilder(
+    column: $table.polylineJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get departureLat => $composableBuilder(
+    column: $table.departureLat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get departureLng => $composableBuilder(
+    column: $table.departureLng,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get destinationLat => $composableBuilder(
+    column: $table.destinationLat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get destinationLng => $composableBuilder(
+    column: $table.destinationLng,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastUsedAt => $composableBuilder(
+    column: $table.lastUsedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$UserProfilesTableOrderingComposer get userId {
+    final $$UserProfilesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.userProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UserProfilesTableOrderingComposer(
+            $db: $db,
+            $table: $db.userProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SavedRoutesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SavedRoutesTable> {
+  $$SavedRoutesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<double> get targetDistanceM => $composableBuilder(
+    column: $table.targetDistanceM,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get actualDistanceM => $composableBuilder(
+    column: $table.actualDistanceM,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get routeType =>
+      $composableBuilder(column: $table.routeType, builder: (column) => column);
+
+  GeneratedColumn<String> get polylineJson => $composableBuilder(
+    column: $table.polylineJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get departureLat => $composableBuilder(
+    column: $table.departureLat,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get departureLng => $composableBuilder(
+    column: $table.departureLng,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get destinationLat => $composableBuilder(
+    column: $table.destinationLat,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get destinationLng => $composableBuilder(
+    column: $table.destinationLng,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastUsedAt => $composableBuilder(
+    column: $table.lastUsedAt,
+    builder: (column) => column,
+  );
+
+  $$UserProfilesTableAnnotationComposer get userId {
+    final $$UserProfilesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.userProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UserProfilesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.userProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SavedRoutesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SavedRoutesTable,
+          SavedRoute,
+          $$SavedRoutesTableFilterComposer,
+          $$SavedRoutesTableOrderingComposer,
+          $$SavedRoutesTableAnnotationComposer,
+          $$SavedRoutesTableCreateCompanionBuilder,
+          $$SavedRoutesTableUpdateCompanionBuilder,
+          (SavedRoute, $$SavedRoutesTableReferences),
+          SavedRoute,
+          PrefetchHooks Function({bool userId})
+        > {
+  $$SavedRoutesTableTableManager(_$AppDatabase db, $SavedRoutesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SavedRoutesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SavedRoutesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SavedRoutesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> userId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<double> targetDistanceM = const Value.absent(),
+                Value<double> actualDistanceM = const Value.absent(),
+                Value<int> durationSeconds = const Value.absent(),
+                Value<String> routeType = const Value.absent(),
+                Value<String> polylineJson = const Value.absent(),
+                Value<double> departureLat = const Value.absent(),
+                Value<double> departureLng = const Value.absent(),
+                Value<double?> destinationLat = const Value.absent(),
+                Value<double?> destinationLng = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> lastUsedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SavedRoutesCompanion(
+                id: id,
+                userId: userId,
+                name: name,
+                targetDistanceM: targetDistanceM,
+                actualDistanceM: actualDistanceM,
+                durationSeconds: durationSeconds,
+                routeType: routeType,
+                polylineJson: polylineJson,
+                departureLat: departureLat,
+                departureLng: departureLng,
+                destinationLat: destinationLat,
+                destinationLng: destinationLng,
+                isFavorite: isFavorite,
+                createdAt: createdAt,
+                lastUsedAt: lastUsedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String userId,
+                Value<String> name = const Value.absent(),
+                required double targetDistanceM,
+                required double actualDistanceM,
+                required int durationSeconds,
+                required String routeType,
+                required String polylineJson,
+                required double departureLat,
+                required double departureLng,
+                Value<double?> destinationLat = const Value.absent(),
+                Value<double?> destinationLng = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> lastUsedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SavedRoutesCompanion.insert(
+                id: id,
+                userId: userId,
+                name: name,
+                targetDistanceM: targetDistanceM,
+                actualDistanceM: actualDistanceM,
+                durationSeconds: durationSeconds,
+                routeType: routeType,
+                polylineJson: polylineJson,
+                departureLat: departureLat,
+                departureLng: departureLng,
+                destinationLat: destinationLat,
+                destinationLng: destinationLng,
+                isFavorite: isFavorite,
+                createdAt: createdAt,
+                lastUsedAt: lastUsedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$SavedRoutesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({userId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (userId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.userId,
+                                referencedTable: $$SavedRoutesTableReferences
+                                    ._userIdTable(db),
+                                referencedColumn: $$SavedRoutesTableReferences
+                                    ._userIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SavedRoutesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SavedRoutesTable,
+      SavedRoute,
+      $$SavedRoutesTableFilterComposer,
+      $$SavedRoutesTableOrderingComposer,
+      $$SavedRoutesTableAnnotationComposer,
+      $$SavedRoutesTableCreateCompanionBuilder,
+      $$SavedRoutesTableUpdateCompanionBuilder,
+      (SavedRoute, $$SavedRoutesTableReferences),
+      SavedRoute,
+      PrefetchHooks Function({bool userId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6593,4 +8238,6 @@ class $AppDatabaseManager {
       $$ConditionLogsTableTableManager(_db, _db.conditionLogs);
   $$PainAreasTableTableManager get painAreas =>
       $$PainAreasTableTableManager(_db, _db.painAreas);
+  $$SavedRoutesTableTableManager get savedRoutes =>
+      $$SavedRoutesTableTableManager(_db, _db.savedRoutes);
 }

@@ -183,6 +183,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => context.push(AppRoutes.displaySettings),
           ),
           _SettingsTile(
+            icon: Icons.alt_route_rounded,
+            title: '計測設定',
+            subtitle: (settings?.gpsCorrectionEnabled ?? true)
+                ? 'GPS 補正: ON'
+                : 'GPS 補正: OFF',
+            onTap: () => context.push(AppRoutes.trackingSettings),
+          ),
+          _SettingsTile(
             icon: Icons.notifications_outlined,
             title: '通知',
             subtitle: 'Phase 2 で対応予定',

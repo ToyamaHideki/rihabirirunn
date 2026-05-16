@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'location_service.dart';
+import 'map_matching_service.dart';
 import 'notification_service.dart';
 import 'run_snapshot_service.dart';
 
@@ -119,11 +120,13 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
     this._locationService,
     this._notificationService,
     this._snapshotService,
+    this._mapMatchingService,
   ) : super(const TrackingState());
 
   final LocationService _locationService;
   final NotificationService _notificationService;
   final RunSnapshotService _snapshotService;
+  final MapMatchingService _mapMatchingService;
 
   StreamSubscription<Position>? _positionSub;
   Timer? _timer;
@@ -176,19 +179,54 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
   }
 
   /// 走行終了 — 最終の TrackingState を返す（DB 保存用）
-  Future<TrackingState> stop() async {
+  ///
+  /// [applyMapMatching] が true の場合、終了時に GPS 列を Mapbox Map Matching API で
+  /// 道路上にスナップして positions と distance を補正する。
+  /// 失敗時は生 GPS データのままフォールバック。
+  Future<TrackingState> stop({bool applyMapMatching = false}) async {
     _positionSub?.cancel();
     _timer?.cancel();
     _positionSub = null;
     _timer = null;
     _lastPositionTime = null;
 
-    final finalState = state.copyWith(status: TrackingStatus.stopped);
+    // T-2.5: Map Matching による道路スナップ補正
+    var finalPositions = state.positions;
+    var finalDistance = state.distanceMeters;
+    if (applyMapMatching && finalPositions.length >= 2) {
+      try {
+        final matched = await _mapMatchingService.match(finalPositions);
+        if (matched.length >= 2 && !identical(matched, finalPositions)) {
+          finalPositions = matched;
+          finalDistance = _calculateTotalDistance(matched);
+        }
+      } catch (_) {
+        // フォールバック: 生データのまま使用
+      }
+    }
+
+    final finalState = state.copyWith(
+      status: TrackingStatus.stopped,
+      positions: finalPositions,
+      distanceMeters: finalDistance,
+    );
     state = finalState;
     await _notificationService.cancelRunningNotification();
     // T-2.3.1: 正常終了時はスナップショットを削除
     await _snapshotService.clear();
     return finalState;
+  }
+
+  /// 座標列の合計距離（Haversine）を計算する
+  ///
+  /// Map Matching の結果に対する距離再計算で使用。
+  static double _calculateTotalDistance(List<LatLng> points) {
+    if (points.length < 2) return 0;
+    double total = 0;
+    for (var i = 1; i < points.length; i++) {
+      total += _haversine(points[i - 1], points[i]);
+    }
+    return total;
   }
 
   // ---- 内部処理 ----
@@ -366,5 +404,6 @@ final trackingNotifierProvider =
     ref.watch(locationServiceProvider),
     ref.watch(notificationServiceProvider),
     ref.watch(runSnapshotServiceProvider),
+    ref.watch(mapMatchingServiceProvider),
   );
 });

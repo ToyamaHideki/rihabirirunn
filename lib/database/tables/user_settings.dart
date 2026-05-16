@@ -31,6 +31,13 @@ class UserSettings extends Table {
   BoolColumn get weatherAlertEnabled =>
       boolean().withDefault(const Constant(false))();
 
+  /// GPS 軌跡を Mapbox Map Matching API で道路にスナップするか
+  ///
+  /// true: 走行終了時に GPS 列を Map Matching に投げ、道路上に補正してから保存。
+  /// false: 生 GPS 座標をそのまま保存。
+  BoolColumn get gpsCorrectionEnabled =>
+      boolean().withDefault(const Constant(true))();
+
   DateTimeColumn get updatedAt => dateTime()();
 
   @override

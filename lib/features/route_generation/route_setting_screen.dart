@@ -6,7 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../database/database.dart';
 import '../../shared/models/route_result.dart';
+import '../../shared/repositories/saved_route_repository.dart';
+import '../../shared/repositories/user_profile_repository.dart';
 import '../../shared/router/app_routes.dart';
 import '../../shared/services/directions_service.dart';
 import '../../shared/services/location_service.dart';
@@ -34,13 +37,40 @@ class RouteSettingScreen extends ConsumerStatefulWidget {
 
 class _RouteSettingScreenState extends ConsumerState<RouteSettingScreen> {
   // ---- 状態 ----
-  double _distanceM = 1000.0; // デフォルト 1 km
+  double _distanceM = 1000.0; // デフォルト 1 km（プロフィール読込前のフォールバック）
   RouteType _routeType = RouteType.circular;
   LatLng? _departure; // null = GPS 現在地を使用
   LatLng? _destination; // 片道用・任意
   _PinMode _pinMode = _PinMode.none;
   bool _isGenerating = false;
   String? _error;
+
+  // ---- 初期データ ----
+  String? _userId; // 保存ルート紐付け用
+  bool _hasSavedRoutes = false; // 「保存済みルート」ボタン表示制御
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+  }
+
+  /// プロフィールから「今日の目標距離」を初期値に設定し、保存ルートの有無を確認
+  Future<void> _loadInitialData() async {
+    final profile =
+        await ref.read(userProfileRepositoryProvider).getProfile();
+    if (!mounted) return;
+    if (profile == null) return;
+    final mostRecent = await ref
+        .read(savedRouteRepositoryProvider)
+        .getMostRecent(profile.id);
+    if (!mounted) return;
+    setState(() {
+      _userId = profile.id;
+      _distanceM = profile.currentTargetDistance.clamp(100.0, 21000.0);
+      _hasSavedRoutes = mostRecent != null;
+    });
+  }
 
   // ---- 距離フォーマット ----
   String get _distanceLabel {
@@ -122,6 +152,21 @@ class _RouteSettingScreenState extends ConsumerState<RouteSettingScreen> {
 
     switch (result) {
       case RouteSuccess(:final route):
+        // ③ 生成成功時に保存ルートへ自動追加（失敗しても画面遷移は継続）
+        if (_userId != null) {
+          try {
+            await ref.read(savedRouteRepositoryProvider).saveRoute(
+                  userId: _userId!,
+                  route: route,
+                  targetDistanceMeters: _distanceM,
+                  departure: departure,
+                  destination: _destination,
+                );
+          } catch (_) {
+            // 保存失敗はサイレント（生成自体は成功している）
+          }
+        }
+        if (!mounted) return;
         context.push(
           AppRoutes.routePreview,
           extra: RoutePreviewArgs(
@@ -135,6 +180,55 @@ class _RouteSettingScreenState extends ConsumerState<RouteSettingScreen> {
       case RouteFailure():
         setState(() => _error = (result as RouteFailure).userMessage);
     }
+  }
+
+  // ---- ③ 保存済みルートから選択 ----
+
+  Future<void> _openSavedRoutesSheet() async {
+    final userId = _userId;
+    if (userId == null) return;
+    final routes = await ref
+        .read(savedRouteRepositoryProvider)
+        .listRecent(userId, limit: 20);
+    if (!mounted) return;
+    if (routes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('保存済みのルートはありません')),
+      );
+      return;
+    }
+    final selected = await showModalBottomSheet<SavedRoute>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _SavedRoutesSheet(routes: routes),
+    );
+    if (selected != null && mounted) {
+      _useSavedRoute(selected);
+    }
+  }
+
+  /// 保存ルートを選択 → プレビュー画面へ
+  void _useSavedRoute(SavedRoute saved) {
+    final routeResult = SavedRouteRepository.toRouteResult(saved);
+    final departure = LatLng(saved.departureLat, saved.departureLng);
+    final destination =
+        (saved.destinationLat != null && saved.destinationLng != null)
+            ? LatLng(saved.destinationLat!, saved.destinationLng!)
+            : null;
+
+    // 最終使用日時を更新（並列で fire-and-forget）
+    ref.read(savedRouteRepositoryProvider).markUsed(saved.id);
+
+    context.push(
+      AppRoutes.routePreview,
+      extra: RoutePreviewArgs(
+        routeResult: routeResult,
+        distanceMeters: saved.targetDistanceM,
+        routeType: routeResult.routeType,
+        departure: departure,
+        destination: destination,
+      ),
+    );
   }
 
   // ---- ビルド ----
@@ -210,6 +304,7 @@ class _RouteSettingScreenState extends ConsumerState<RouteSettingScreen> {
                   pinMode: _pinMode,
                   isGenerating: _isGenerating,
                   error: _error,
+                  hasSavedRoutes: _hasSavedRoutes,
                   remainingRequests:
                       ref.watch(remainingRouteRequestsProvider),
                   onDistanceChanged: (v) => setState(
@@ -224,6 +319,7 @@ class _RouteSettingScreenState extends ConsumerState<RouteSettingScreen> {
                       setState(() => _pinMode = _PinMode.destination),
                   onClearDestination: () =>
                       setState(() => _destination = null),
+                  onOpenSavedRoutes: _openSavedRoutesSheet,
                   onGenerate: _isGenerating ? null : _generate,
                 ),
               ),
@@ -315,6 +411,7 @@ class _SettingPanel extends StatelessWidget {
     required this.pinMode,
     required this.isGenerating,
     required this.error,
+    required this.hasSavedRoutes,
     required this.remainingRequests,
     required this.onDistanceChanged,
     required this.onRouteTypeChanged,
@@ -322,6 +419,7 @@ class _SettingPanel extends StatelessWidget {
     required this.onClearDeparture,
     required this.onSetDestinationPin,
     required this.onClearDestination,
+    required this.onOpenSavedRoutes,
     required this.onGenerate,
   });
 
@@ -333,6 +431,7 @@ class _SettingPanel extends StatelessWidget {
   final _PinMode pinMode;
   final bool isGenerating;
   final String? error;
+  final bool hasSavedRoutes;
   final int remainingRequests;
   final ValueChanged<double> onDistanceChanged;
   final ValueChanged<RouteType> onRouteTypeChanged;
@@ -340,6 +439,7 @@ class _SettingPanel extends StatelessWidget {
   final VoidCallback onClearDeparture;
   final VoidCallback onSetDestinationPin;
   final VoidCallback onClearDestination;
+  final VoidCallback onOpenSavedRoutes;
   final VoidCallback? onGenerate;
 
   @override
@@ -376,7 +476,26 @@ class _SettingPanel extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+
+            // ---- ③ 保存済みルートから選ぶ ----
+            if (hasSavedRoutes)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onOpenSavedRoutes,
+                  icon: const Icon(Icons.history_rounded, size: 18),
+                  label: const Text('保存済みルート'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    foregroundColor: colorScheme.primary,
+                  ),
+                ),
+              ),
+            if (hasSavedRoutes) const SizedBox(height: 4),
 
             // ---- T-1.3.1: 距離スライダー ----
             Row(
@@ -658,6 +777,203 @@ class _PinMarker extends StatelessWidget {
             fontSize: 11,
             fontWeight: FontWeight.w700,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ③ 保存済みルート選択シート
+// ---------------------------------------------------------------------------
+
+class _SavedRoutesSheet extends ConsumerStatefulWidget {
+  const _SavedRoutesSheet({required this.routes});
+
+  final List<SavedRoute> routes;
+
+  @override
+  ConsumerState<_SavedRoutesSheet> createState() => _SavedRoutesSheetState();
+}
+
+class _SavedRoutesSheetState extends ConsumerState<_SavedRoutesSheet> {
+  late List<SavedRoute> _routes;
+
+  @override
+  void initState() {
+    super.initState();
+    _routes = List<SavedRoute>.from(widget.routes);
+  }
+
+  String _formatDistance(double meters) {
+    if (meters < 1000) return '${meters.round()}m';
+    return '${(meters / 1000).toStringAsFixed(1)}km';
+  }
+
+  String _formatDate(DateTime dt) {
+    return '${dt.year}/${dt.month}/${dt.day}';
+  }
+
+  String _routeLabel(SavedRoute r) {
+    if (r.name.isNotEmpty) return r.name;
+    final typeLabel = r.routeType == RouteType.oneWay.name ? '片道' : '周回';
+    return '$typeLabel ${_formatDistance(r.actualDistanceM)}';
+  }
+
+  Future<void> _toggleFavorite(SavedRoute r) async {
+    final next = !r.isFavorite;
+    await ref
+        .read(savedRouteRepositoryProvider)
+        .setFavorite(r.id, next);
+    if (!mounted) return;
+    setState(() {
+      final idx = _routes.indexWhere((e) => e.id == r.id);
+      if (idx >= 0) {
+        _routes[idx] = _routes[idx].copyWith(isFavorite: next);
+      }
+    });
+  }
+
+  Future<void> _delete(SavedRoute r) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ルートを削除しますか？'),
+        content: Text('${_routeLabel(r)} を保存済みルートから削除します。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade600),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(savedRouteRepositoryProvider).delete(r.id);
+    if (!mounted) return;
+    setState(() => _routes.removeWhere((e) => e.id == r.id));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (ctx, controller) => Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // ハンドルバー
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            // タイトル
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.bookmark_rounded,
+                      color: colorScheme.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text('保存済みルート', style: textTheme.titleMedium),
+                  const Spacer(),
+                  Text(
+                    '${_routes.length} 件',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // リスト
+            Expanded(
+              child: _routes.isEmpty
+                  ? Center(
+                      child: Text(
+                        '保存済みのルートはありません',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: controller,
+                      itemCount: _routes.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (ctx, idx) {
+                        final r = _routes[idx];
+                        return ListTile(
+                          leading: Icon(
+                            r.routeType == RouteType.oneWay.name
+                                ? Icons.arrow_forward_rounded
+                                : Icons.loop_rounded,
+                            color: colorScheme.primary,
+                          ),
+                          title: Text(_routeLabel(r)),
+                          subtitle: Text(
+                            '${_formatDistance(r.actualDistanceM)} '
+                            '・ ${_formatDate(r.lastUsedAt ?? r.createdAt)}',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  r.isFavorite
+                                      ? Icons.star_rounded
+                                      : Icons.star_border_rounded,
+                                  color: r.isFavorite
+                                      ? Colors.amber.shade600
+                                      : colorScheme.outline,
+                                ),
+                                tooltip:
+                                    r.isFavorite ? 'お気に入り解除' : 'お気に入り',
+                                onPressed: () => _toggleFavorite(r),
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: colorScheme.outline,
+                                ),
+                                tooltip: '削除',
+                                onPressed: () => _delete(r),
+                              ),
+                            ],
+                          ),
+                          onTap: () => Navigator.of(context).pop(r),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );

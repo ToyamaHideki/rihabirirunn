@@ -44,6 +44,22 @@ const _kBearingRetries = 4;
 /// 1日の最大ルート生成リクエスト回数（ユーザー向け）— T-1.2.4
 const _kDailyLimit = 10;
 
+/// 自己重複検出のサンプリング間隔（m）
+const _kOverlapSampleStepM = 20.0;
+
+/// 「同じ道」と判定する 2 サンプル間の距離しきい値（m）
+const _kOverlapNearM = 12.0;
+
+/// 自己重複比較で「隣接」とみなすサンプル数（この範囲内は無視）
+/// 6 サンプル ≒ 120m
+const _kOverlapMinIndexGap = 6;
+
+/// 周回ルートの自然な始点-終点近接を無視するためのバッファサンプル数
+const _kOverlapClosureBuffer = 2;
+
+/// 自己重複比率の許容値（これ以上は「同じ道を回るルート」とみなす）
+const _kOverlapThreshold = 0.20;
+
 // ---------------------------------------------------------------------------
 // ルートジェネレーター
 // ---------------------------------------------------------------------------
@@ -175,13 +191,15 @@ class RouteGenerator {
         bestResult = candidate;
       }
 
-      // U-ターンがなければ即確定して返す
-      if (!_hasUTurns(candidate.points)) {
+      // U-ターンがなく自己重複も少なければ即確定して返す
+      // ① 自己重複 = 同じ道を 2 回以上通る箇所が ${_kOverlapThreshold*100}% 以上ある状態
+      if (!_hasUTurns(candidate.points) &&
+          _selfOverlapRatio(candidate.points) < _kOverlapThreshold) {
         _incrementRateLimit();
         _cache[cacheKey] = candidate;
         return RouteSuccess(candidate);
       }
-      // U-ターンあり → 次の方向で再試行
+      // U-ターンあり or 同じ道のループあり → 次の方向で再試行
     }
 
     // 全方向でU-ターンを回避できなかった → フォールバック結果を返す（hasUTurns=true でUI警告）
@@ -327,7 +345,8 @@ class RouteGenerator {
 /// 周回ルート候補のスコアリング
 /// 優先順位:
 ///   1. U-ターンが無い候補（hasUTurns 不検出）
-///   2. 同条件なら目標距離との乖離が小さい候補
+///   2. 自己重複が少ない候補（同じ道を二度通らない）
+///   3. 同条件なら目標距離との乖離が小さい候補
 bool _isBetterCandidate(
     RouteResult candidate, RouteResult current, double targetM) {
   final candHasU = _hasUTurns(candidate.points);
@@ -335,6 +354,18 @@ bool _isBetterCandidate(
 
   // U-ターン有無で優先順位
   if (candHasU != currHasU) return !candHasU;
+
+  // ① 自己重複の少なさで優先順位
+  final candOverlap = _selfOverlapRatio(candidate.points);
+  final currOverlap = _selfOverlapRatio(current.points);
+  // しきい値の上下が異なるなら「しきい値内」を優先
+  final candBelow = candOverlap < _kOverlapThreshold;
+  final currBelow = currOverlap < _kOverlapThreshold;
+  if (candBelow != currBelow) return candBelow;
+  // 同等カテゴリ → 比率差が 5% 以上あれば低い方を優先
+  if ((candOverlap - currOverlap).abs() > 0.05) {
+    return candOverlap < currOverlap;
+  }
 
   // 同条件 → 目標距離との差で比較
   final candDev = (candidate.distanceMeters - targetM).abs();
@@ -448,6 +479,81 @@ double _bearingBetween(LatLng from, LatLng to) {
 double _angleDiff(double b1, double b2) {
   final diff = ((b2 - b1) % 360 + 360) % 360;
   return diff > 180 ? 360 - diff : diff;
+}
+
+// ---------------------------------------------------------------------------
+// ① 自己重複検出ユーティリティ
+// ---------------------------------------------------------------------------
+
+/// ルートの自己重複比率（0.0〜1.0）を返す。
+///
+/// 「自己重複」= 同じ道を 2 回以上通ること（往復・周回での経路再踏み）。
+/// 周回ルートでは始点と終点が同一座標になるため、両端の数サンプルは比較から除外する。
+///
+/// アルゴリズム:
+///   1. ルートを [_kOverlapSampleStepM] m 間隔でサンプリング
+///   2. 各サンプル i について、インデックス差が [_kOverlapMinIndexGap] 以上ある
+///      他のサンプル j との距離を測る
+///   3. 距離 < [_kOverlapNearM] なら「重複」とカウント
+///   4. 比較対象サンプル数に対する重複比率を返す
+double _selfOverlapRatio(List<LatLng> points) {
+  if (points.length < 10) return 0.0;
+
+  final samples = _sampleByDistance(points, _kOverlapSampleStepM);
+  final n = samples.length;
+  if (n < _kOverlapMinIndexGap * 2 + _kOverlapClosureBuffer * 2 + 4) {
+    return 0.0;
+  }
+
+  final start = _kOverlapClosureBuffer;
+  final end = n - _kOverlapClosureBuffer;
+  final tested = end - start;
+  if (tested <= 0) return 0.0;
+
+  int overlapping = 0;
+  for (int i = start; i < end; i++) {
+    for (int j = start; j < end; j++) {
+      if ((j - i).abs() < _kOverlapMinIndexGap) continue;
+      if (_haversineMeters(samples[i], samples[j]) < _kOverlapNearM) {
+        overlapping++;
+        break;
+      }
+    }
+  }
+  return overlapping / tested;
+}
+
+/// 折れ線を距離間隔 [intervalM] でサンプリングする。
+///
+/// 累積距離が intervalM を超えるたびに点を採用し、最終点も末尾に含める。
+List<LatLng> _sampleByDistance(List<LatLng> points, double intervalM) {
+  if (points.length < 2) return List<LatLng>.from(points);
+  final result = <LatLng>[points.first];
+  double acc = 0;
+  for (int i = 1; i < points.length; i++) {
+    acc += _haversineMeters(points[i - 1], points[i]);
+    if (acc >= intervalM) {
+      result.add(points[i]);
+      acc = 0;
+    }
+  }
+  if (result.last != points.last) result.add(points.last);
+  return result;
+}
+
+/// Haversine 距離（m）
+double _haversineMeters(LatLng a, LatLng b) {
+  const r = 6371000.0;
+  final lat1 = a.latitudeInRad;
+  final lat2 = b.latitudeInRad;
+  final dLat = lat2 - lat1;
+  final dLng = b.longitudeInRad - a.longitudeInRad;
+  final s = math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.cos(lat1) *
+          math.cos(lat2) *
+          math.sin(dLng / 2) *
+          math.sin(dLng / 2);
+  return r * 2 * math.atan2(math.sqrt(s), math.sqrt(1 - s));
 }
 
 // ---- Riverpod プロバイダ ----

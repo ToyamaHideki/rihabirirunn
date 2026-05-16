@@ -28,6 +28,7 @@ abstract class AppRoutes {
   static const bodyInfo = '/settings/body-info';
   static const displaySettings = '/settings/display';
   static const dataManagement = '/settings/data';
+  static const trackingSettings = '/settings/tracking';
   static const notificationSettings = '/settings/notifications';
   static const termsOfService = '/settings/terms';
   static const privacyPolicy = '/settings/privacy';

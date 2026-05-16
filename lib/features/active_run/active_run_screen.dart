@@ -12,6 +12,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../shared/repositories/run_session_repository.dart';
 import '../../shared/repositories/user_profile_repository.dart';
+import '../../shared/repositories/user_settings_repository.dart';
 import '../../shared/router/app_routes.dart';
 import '../../shared/services/target_distance_service.dart';
 import '../../shared/services/tracking_service.dart';
@@ -46,6 +47,9 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
   final Battery _battery = Battery();
   int? _batteryLevel;
   Timer? _batteryTimer;
+
+  // T-2.5: 保存中ダイアログの表示状態
+  bool _savingDialogShowing = false;
 
   // ---- ライフサイクル ----
 
@@ -154,14 +158,25 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
     );
 
     if (confirmed == true && mounted) {
-      // 追跡停止
-      final finalState =
-          await ref.read(trackingNotifierProvider.notifier).stop();
-      if (!mounted) return;
+      // 保存中のローディングダイアログ（Map Matching は数秒かかることがある）
+      unawaited(_showSavingDialog());
 
-      // T-2.4.1: DB 保存 → sessionId 取得
+      // T-2.5: ユーザー設定から GPS 補正フラグを取得
       final profile =
           await ref.read(userProfileRepositoryProvider).getProfile();
+      var applyMatching = true;
+      if (profile != null) {
+        final settings = await ref
+            .read(userSettingsRepositoryProvider)
+            .getByUserId(profile.id);
+        applyMatching = settings?.gpsCorrectionEnabled ?? true;
+      }
+      if (!mounted) return;
+
+      // 追跡停止（GPS 補正フラグを渡す）
+      final finalState = await ref
+          .read(trackingNotifierProvider.notifier)
+          .stop(applyMapMatching: applyMatching);
       if (!mounted) return;
 
       if (profile != null) {
@@ -189,13 +204,49 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
                 session: savedSession,
               );
         }
+        _dismissSavingDialog();
         if (mounted) {
           context.go(AppRoutes.runSummaryPath(sessionId));
         }
       } else {
         // プロフィールなし（通常は発生しない）
+        _dismissSavingDialog();
         if (mounted) context.go(AppRoutes.home);
       }
+    }
+  }
+
+  // ---- T-2.5: 保存中ダイアログ ----
+
+  Future<void> _showSavingDialog() async {
+    _savingDialogShowing = true;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+              SizedBox(width: 16),
+              Expanded(child: Text('走行データを保存中...')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _dismissSavingDialog() {
+    if (_savingDialogShowing && mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      _savingDialogShowing = false;
     }
   }
 
