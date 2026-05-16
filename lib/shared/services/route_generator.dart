@@ -51,13 +51,15 @@ class RouteGenerator {
   /// 現在地を起点とした、指定距離±5% の周回ルートを生成する
   ///
   /// アルゴリズム:
-  ///   1. 起点から東・北の方向にウェイポイントを配置（直角三角形形状）
+  ///   1. 起点から正方形の頂点にウェイポイントを配置（4点ループ）
+  ///      start → 東(wp1) → 北東(wp2) → 北(wp3) → start
+  ///      各辺が直交するため折り返しが発生しにくい
   ///   2. Directions API でルートを取得
-  ///   3. 実際の距離が目標と乖離していれば半径を比例補正してリトライ
+  ///   3. 実際の距離が目標と乖離していれば辺長を比例補正してリトライ
   ///
   /// [start]: 出発地点（現在地）
   /// [targetDistanceMeters]: 目標歩行距離（m）
-  /// [bearingOffsetDeg]: ルート方向の回転オフセット（0〜360°）。0=東向き基準
+  /// [bearingOffsetDeg]: ルート方向の回転オフセット（0〜360°）
   Future<RouteGenerationResult> generateCircularRoute({
     required LatLng start,
     required double targetDistanceMeters,
@@ -77,23 +79,27 @@ class RouteGenerator {
       return RouteSuccess(_cache[cacheKey]!);
     }
 
-    // 初期半径の見積もり
-    // 直角三角形の各辺: R, R√2, R → 合計 ≈ 3.41R
-    // 道路係数補正後: 3.41 * 1.35 ≈ 4.6R
-    // よって R_init = target / 4.6
-    double radiusM = targetDistanceMeters / (_kRoadFactor * (2 + math.sqrt2));
+    // 正方形ループの辺の長さを計算
+    // 正方形の周長 = 4 * side
+    // 道路係数補正: 4 * side * _kRoadFactor = target
+    // → side = target / (4 * _kRoadFactor)
+    double side = targetDistanceMeters / (4.0 * _kRoadFactor);
 
     RouteResult? lastResult;
     for (int attempt = 0; attempt < _kMaxRetries; attempt++) {
-      // ウェイポイント配置（直角三角形ループ）
-      // wp1: 東方向
-      // wp2: 北方向
-      final wp1 = _destinationPoint(start, 90 + bearingOffsetDeg, radiusM);
-      final wp2 = _destinationPoint(start, 0 + bearingOffsetDeg, radiusM);
+      // ウェイポイント配置（正方形ループ・時計回り）
+      // wp1: 東方向（辺の長さ分）
+      // wp2: 北東方向（対角線距離 side√2）
+      // wp3: 北方向（辺の長さ分）
+      // → 各辺が東→北→西→南と直交し折り返しが発生しにくい
+      final wp1 = _destinationPoint(start, 90 + bearingOffsetDeg, side);
+      final wp2 = _destinationPoint(
+          start, 45 + bearingOffsetDeg, side * math.sqrt2);
+      final wp3 = _destinationPoint(start, 0 + bearingOffsetDeg, side);
 
       try {
         final result = await _directionsService.getRoute(
-          [start, wp1, wp2, start],
+          [start, wp1, wp2, wp3, start],
           routeType: RouteType.circular,
         );
         lastResult = result;
@@ -108,11 +114,11 @@ class RouteGenerator {
           return RouteSuccess(result);
         }
 
-        // 比例補正: 実距離が短ければ半径を拡大、長ければ縮小
-        radiusM *= targetDistanceMeters / result.distanceMeters;
+        // 比例補正: 実距離が短ければ辺を拡大、長ければ縮小
+        side *= targetDistanceMeters / result.distanceMeters;
       } on RouteApiException catch (e) {
         if (e.type == RouteErrorType.noRouteFound && attempt < _kMaxRetries - 1) {
-          // ウェイポイントを少しずらして再試行
+          // 45° 回転して再試行（菱形ループに切替）
           bearingOffsetDeg += 45;
           continue;
         }
