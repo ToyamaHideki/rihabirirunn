@@ -29,11 +29,14 @@ class DirectionsService {
   ///
   /// [waypoints]: 始点〜終点を含む 2〜25 点のリスト。
   ///   周回ルートの場合は始点と終点を同一座標にすること。
+  /// [continueStraight]: 中間ウェイポイントでの U-ターンを禁止するか。
+  ///   true で道路の都合で U-ターンが必要な場合は NoRoute が返る → 呼び元でフォールバック可能。
   ///
   /// Throws [RouteApiException] on any failure.
   Future<RouteResult> getRoute(
     List<LatLng> waypoints, {
     required RouteType routeType,
+    bool continueStraight = false,
   }) async {
     if (waypoints.length < 2) {
       throw const RouteApiException(
@@ -54,13 +57,19 @@ class DirectionsService {
             '${p.longitude.toStringAsFixed(6)},${p.latitude.toStringAsFixed(6)}')
         .join(';');
 
-    final uri = Uri.parse(
-      '$_baseUrl/$coords'
-      '?geometries=geojson'
-      '&overview=full'
-      '&steps=false'
-      '&access_token=$_token',
-    );
+    // クエリパラメータを動的に組み立てる
+    final params = <String>[
+      'geometries=geojson',
+      'overview=full',
+      'steps=false',
+    ];
+    // continue_straight は中間ウェイポイントがある場合のみ有効
+    if (waypoints.length > 2 && continueStraight) {
+      params.add('continue_straight=true');
+    }
+    params.add('access_token=$_token');
+
+    final uri = Uri.parse('$_baseUrl/$coords?${params.join('&')}');
 
     try {
       final response = await _client.get(uri).timeout(_timeout);

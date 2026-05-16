@@ -26,9 +26,16 @@ const _kUTurnAngleDeg = 120.0;
 /// U-ターン検出用サンプリング点数（全座標からこの数に均等間引き）
 const _kUTurnSampleN = 30;
 
-/// 周回ルートのウェイポイント数（正多角形の頂点数）
-/// 正五角形: 直角が少なく道路網に合いやすい
-const _kCircleN = 5;
+/// 周回ルートのウェイポイント数（正多角形の頂点数）の最小値・最大値
+/// 距離に応じて 1辺が _kPreferredSideM 程度になるよう調整する
+const _kMinCircleN = 5;
+const _kMaxCircleN = 10;
+
+/// 多角形 1辺の目標長さ（m）
+/// 短すぎる辺はウェイポイントが同じ道路に snap されて折り返しの原因になる。
+/// 長すぎる辺はその区間内で袋小路への迂回が起こりやすい。
+/// 150〜200m が経験的にバランスが良い。
+const _kPreferredSideM = 180.0;
 
 /// U-ターン回避のための方向リトライ数
 /// 90° ずつ回転して最大 4 方向を試行する
@@ -66,11 +73,15 @@ class RouteGenerator {
   /// 現在地を起点とした、指定距離±5% の周回ルートを生成する
   ///
   /// アルゴリズム:
-  ///   1. 起点から正方形の頂点にウェイポイントを配置（4点ループ）
-  ///      start → 東(wp1) → 北東(wp2) → 北(wp3) → start
-  ///   2. Directions API でルートを取得・距離を比例補正してリトライ
-  ///   3. 折り返し（U-ターン）を検出した場合は距離を段階的に拡大して再試行
-  ///      短距離ほど正方形が小さく道路ネットワークに合いにくいため自動調整する
+  ///   1. 距離に応じて頂点数 N を決定（1辺 ~180m 目安、5〜10 頂点）
+  ///   2. 起点から時計回りに正 N 角形を描くウェイポイント列を構築
+  ///   3. Directions API を `continue_straight=true` で呼び、
+  ///      中間ウェイポイントでのU-ターンを禁止
+  ///   4. NoRoute なら `continue_straight=false` でフォールバック
+  ///   5. 距離乖離が ±5% 超なら辺長を比例補正してリトライ（最大 3 回）
+  ///   6. U-ターンが残る場合は 90° ずつ回転して最大 4 方向を試行
+  ///   7. 全方向で U-ターンが残った場合は最良候補に hasUTurns=true を付けて返す
+  ///      （UI でユーザーに注意メッセージを表示）
   ///
   /// [start]: 出発地点（現在地）
   /// [targetDistanceMeters]: 目標歩行距離（m）
@@ -96,50 +107,73 @@ class RouteGenerator {
 
     RouteResult? bestResult; // U-ターンがあっても最低限返せる結果
 
-    // 正五角形を 90° ずつ回転しながら最大 _kBearingRetries 方向を試行
+    // 距離に応じて頂点数を選択（1辺が ~_kPreferredSideM になるよう調整）
+    final n = ((targetDistanceMeters / _kPreferredSideM).ceil())
+        .clamp(_kMinCircleN, _kMaxCircleN);
+
+    // 正多角形を 90° ずつ回転しながら最大 _kBearingRetries 方向を試行
     // 向きを変えることで道路網の一方通行・行き止まりを回避しやすくなる
     for (int bearingIdx = 0; bearingIdx < _kBearingRetries; bearingIdx++) {
       final bearing = (bearingOffsetDeg + bearingIdx * 90.0) % 360.0;
 
-      // 正五角形の1辺の長さ（初期推定）
+      // 多角形の1辺の長さ（初期推定）
       // 辺の数 × 辺長 × 道路係数 ≒ 目標距離
-      double side = targetDistanceMeters / (_kCircleN * _kRoadFactor);
+      double side = targetDistanceMeters / (n * _kRoadFactor);
 
       RouteResult? candidate;
       for (int attempt = 0; attempt < _kMaxRetries; attempt++) {
-        // 正五角形ウェイポイントを生成（時計回り）
-        final waypoints =
-            _polygonWaypoints(start, bearing, side, _kCircleN);
+        // 正多角形ウェイポイントを生成（時計回り）
+        final waypoints = _polygonWaypoints(start, bearing, side, n);
+        final route = [start, ...waypoints, start];
 
         try {
+          // 1st: continue_straight=true で中間ウェイポイントでのU-ターンを禁止
           candidate = await _directionsService.getRoute(
-            [start, ...waypoints, start],
+            route,
             routeType: RouteType.circular,
+            continueStraight: true,
           );
-
-          // 距離が許容範囲内なら内側ループを抜ける
-          final deviation =
-              (candidate.distanceMeters - targetDistanceMeters).abs() /
-                  targetDistanceMeters;
-          if (deviation <= _kTolerance) break;
-
-          // 比例補正: 実距離に合わせて辺を拡縮
-          side *= targetDistanceMeters / candidate.distanceMeters;
         } on RouteApiException catch (e) {
-          if (e.type == RouteErrorType.noRouteFound &&
-              attempt < _kMaxRetries - 1) {
-            side *= 1.2; // ルートなし → 辺を 20% 拡大して再試行
-            continue;
+          if (e.type == RouteErrorType.noRouteFound) {
+            // フォールバック: continue_straight 制約を外して再試行
+            // （道路網の都合で waypoint U-ターンが必要なケース）
+            try {
+              candidate = await _directionsService.getRoute(
+                route,
+                routeType: RouteType.circular,
+                continueStraight: false,
+              );
+            } on RouteApiException {
+              if (attempt < _kMaxRetries - 1) {
+                side *= 1.2; // 辺を 20% 拡大して再試行
+                continue;
+              }
+              candidate = null;
+              break;
+            }
+          } else {
+            return RouteFailure(errorType: e.type, message: e.message);
           }
-          candidate = null;
-          break; // この方向は諦めて次の向きへ
         }
+
+        // 距離が許容範囲内なら内側ループを抜ける
+        final deviation =
+            (candidate.distanceMeters - targetDistanceMeters).abs() /
+                targetDistanceMeters;
+        if (deviation <= _kTolerance) break;
+
+        // 比例補正: 実距離に合わせて辺を拡縮
+        side *= targetDistanceMeters / candidate.distanceMeters;
       }
 
       if (candidate == null) continue;
 
       // 最初に得られた結果をフォールバックとして保持
-      bestResult ??= candidate;
+      // ただし「目標距離に近い」「U-ターンが少ない」結果を優先する
+      if (bestResult == null ||
+          _isBetterCandidate(candidate, bestResult, targetDistanceMeters)) {
+        bestResult = candidate;
+      }
 
       // U-ターンがなければ即確定して返す
       if (!_hasUTurns(candidate.points)) {
@@ -284,6 +318,28 @@ class RouteGenerator {
 
   /// キャッシュをクリアする（例: 場所が大きく変わった場合）
   void clearCache() => _cache.clear();
+}
+
+// ---------------------------------------------------------------------------
+// 候補比較
+// ---------------------------------------------------------------------------
+
+/// 周回ルート候補のスコアリング
+/// 優先順位:
+///   1. U-ターンが無い候補（hasUTurns 不検出）
+///   2. 同条件なら目標距離との乖離が小さい候補
+bool _isBetterCandidate(
+    RouteResult candidate, RouteResult current, double targetM) {
+  final candHasU = _hasUTurns(candidate.points);
+  final currHasU = _hasUTurns(current.points);
+
+  // U-ターン有無で優先順位
+  if (candHasU != currHasU) return !candHasU;
+
+  // 同条件 → 目標距離との差で比較
+  final candDev = (candidate.distanceMeters - targetM).abs();
+  final currDev = (current.distanceMeters - targetM).abs();
+  return candDev < currDev;
 }
 
 // ---------------------------------------------------------------------------
