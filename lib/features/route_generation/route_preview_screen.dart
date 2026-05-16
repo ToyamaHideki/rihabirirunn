@@ -195,6 +195,7 @@ class _RoutePreviewScreenState extends ConsumerState<RoutePreviewScreen> {
                   result: result,
                   isRegenerating: _isRegenerating,
                   error: _error,
+                  targetDistanceMeters: _args?.distanceMeters,
                   onRegenerate: _isRegenerating ? null : _regenerate,
                   // T-3.1: conditionPre（走行前体調入力）を経由して activeRun へ
                   onStart: () =>
@@ -245,6 +246,7 @@ class _PreviewPanel extends StatelessWidget {
     required this.error,
     required this.onRegenerate,
     required this.onStart,
+    this.targetDistanceMeters,
   });
 
   final RouteResult result;
@@ -253,10 +255,23 @@ class _PreviewPanel extends StatelessWidget {
   final VoidCallback? onRegenerate;
   final VoidCallback onStart;
 
+  /// 目標距離（m）。null の場合は乖離メッセージを表示しない
+  final double? targetDistanceMeters;
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+
+    // 距離乖離の判定（目標比 5% 超で表示）
+    final targetDist = targetDistanceMeters;
+    final hasDistanceDeviation = targetDist != null &&
+        (result.distanceMeters - targetDist).abs() / targetDist > 0.05;
+    final targetFormatted = targetDist != null
+        ? (targetDist < 1000
+            ? '${targetDist.round()}m'
+            : '${(targetDist / 1000).toStringAsFixed(1)}km')
+        : '';
 
     return Container(
       decoration: BoxDecoration(
@@ -311,6 +326,34 @@ class _PreviewPanel extends StatelessWidget {
               ),
             ],
           ),
+
+          // 距離乖離メッセージ（実際の距離が目標から 5% 超ずれた場合）
+          if (hasDistanceDeviation) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      color: Colors.blue.shade700, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ルートの都合上、実際の距離が${result.formattedDistance}になっています（目標: $targetFormatted）。',
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: Colors.blue.shade800),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           // U-ターン警告（短距離で折り返しが発生した場合）
           if (result.hasUTurns) ...[

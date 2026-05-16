@@ -21,14 +21,18 @@ const _kMaxRetries = 3;
 
 /// U-ターン判定の方位変化しきい値（度）
 /// これを超える急激な方向転換を折り返しとみなす
-const _kUTurnAngleDeg = 140.0;
+const _kUTurnAngleDeg = 120.0;
 
 /// U-ターン検出用サンプリング点数（全座標からこの数に均等間引き）
-const _kUTurnSampleN = 20;
+const _kUTurnSampleN = 30;
 
-/// 折り返し回避のための距離拡大率リスト
-/// U-ターン検出時に順番に試行する（元の距離 → +25% → +50%）
-const _kUTurnMultipliers = [1.0, 1.1, 1.2];
+/// 周回ルートのウェイポイント数（正多角形の頂点数）
+/// 正五角形: 直角が少なく道路網に合いやすい
+const _kCircleN = 5;
+
+/// U-ターン回避のための方向リトライ数
+/// 90° ずつ回転して最大 4 方向を試行する
+const _kBearingRetries = 4;
 
 /// 1日の最大ルート生成リクエスト回数（ユーザー向け）— T-1.2.4
 const _kDailyLimit = 10;
@@ -92,48 +96,43 @@ class RouteGenerator {
 
     RouteResult? bestResult; // U-ターンがあっても最低限返せる結果
 
-    // U-ターンが残る場合は距離を段階的に拡大して再試行
-    // 短距離は正方形が小さくなりすぎるため +25%, +50% へ自動調整
-    for (final multiplier in _kUTurnMultipliers) {
-      final adjustedTarget = targetDistanceMeters * multiplier;
+    // 正五角形を 90° ずつ回転しながら最大 _kBearingRetries 方向を試行
+    // 向きを変えることで道路網の一方通行・行き止まりを回避しやすくなる
+    for (int bearingIdx = 0; bearingIdx < _kBearingRetries; bearingIdx++) {
+      final bearing = (bearingOffsetDeg + bearingIdx * 90.0) % 360.0;
 
-      // 正方形ループの辺の長さを計算
-      // 正方形の周長 = 4 * side、道路係数補正後:
-      // 4 * side * _kRoadFactor = adjustedTarget → side = adjustedTarget / (4 * _kRoadFactor)
-      double side = adjustedTarget / (4.0 * _kRoadFactor);
-      double bearing = bearingOffsetDeg; // 各multiplierごとにリセット
+      // 正五角形の1辺の長さ（初期推定）
+      // 辺の数 × 辺長 × 道路係数 ≒ 目標距離
+      double side = targetDistanceMeters / (_kCircleN * _kRoadFactor);
 
       RouteResult? candidate;
       for (int attempt = 0; attempt < _kMaxRetries; attempt++) {
-        // ウェイポイント配置（正方形ループ・時計回り）
-        // 東 → 北東 → 北 → start の順で各辺が直交し折り返しが出にくい
-        final wp1 = _destinationPoint(start, 90 + bearing, side);
-        final wp2 =
-            _destinationPoint(start, 45 + bearing, side * math.sqrt2);
-        final wp3 = _destinationPoint(start, 0 + bearing, side);
+        // 正五角形ウェイポイントを生成（時計回り）
+        final waypoints =
+            _polygonWaypoints(start, bearing, side, _kCircleN);
 
         try {
           candidate = await _directionsService.getRoute(
-            [start, wp1, wp2, wp3, start],
+            [start, ...waypoints, start],
             routeType: RouteType.circular,
           );
 
           // 距離が許容範囲内なら内側ループを抜ける
           final deviation =
-              (candidate.distanceMeters - adjustedTarget).abs() /
-                  adjustedTarget;
+              (candidate.distanceMeters - targetDistanceMeters).abs() /
+                  targetDistanceMeters;
           if (deviation <= _kTolerance) break;
 
           // 比例補正: 実距離に合わせて辺を拡縮
-          side *= adjustedTarget / candidate.distanceMeters;
+          side *= targetDistanceMeters / candidate.distanceMeters;
         } on RouteApiException catch (e) {
           if (e.type == RouteErrorType.noRouteFound &&
               attempt < _kMaxRetries - 1) {
-            // 45° 回転して再試行（菱形ループに切替）
-            bearing += 45;
+            side *= 1.2; // ルートなし → 辺を 20% 拡大して再試行
             continue;
           }
-          return RouteFailure(errorType: e.type, message: e.message);
+          candidate = null;
+          break; // この方向は諦めて次の向きへ
         }
       }
 
@@ -148,10 +147,10 @@ class RouteGenerator {
         _cache[cacheKey] = candidate;
         return RouteSuccess(candidate);
       }
-      // U-ターンあり → 次の距離で再試行
+      // U-ターンあり → 次の方向で再試行
     }
 
-    // 全距離でU-ターンを回避できなかった → フォールバック結果を返す（hasUTurns=true でUI警告）
+    // 全方向でU-ターンを回避できなかった → フォールバック結果を返す（hasUTurns=true でUI警告）
     if (bestResult != null) {
       _incrementRateLimit();
       final withFlag = bestResult.copyWith(hasUTurns: true);
@@ -161,7 +160,7 @@ class RouteGenerator {
 
     return const RouteFailure(
       errorType: RouteErrorType.distanceNotAchievable,
-      message: '指定距離のルートを $kMaxRetries 回試行しましたが生成できませんでした',
+      message: '指定距離のルートを生成できませんでした',
     );
   }
 
@@ -290,6 +289,25 @@ class RouteGenerator {
 // ---------------------------------------------------------------------------
 // 地理計算ユーティリティ
 // ---------------------------------------------------------------------------
+
+/// 正N角形ルートのウェイポイントを生成する
+///
+/// [start] を第1頂点とし、[bearingDeg] 方向に歩き始めて時計回りに N 辺を描く。
+/// 戻り値は [start] と [start] の間に挟む N-1 個の中間点。
+///
+/// 各頂点は直前の頂点から [sideM] メートル離れた位置に配置される。
+/// 時計回りの外角 = 360° / N を毎頂点加算することで正多角形が閉じる。
+List<LatLng> _polygonWaypoints(
+    LatLng start, double bearingDeg, double sideM, int n) {
+  final exteriorAngle = 360.0 / n;
+  var pos = start;
+  var dir = bearingDeg;
+  return List.generate(n - 1, (_) {
+    pos = _destinationPoint(pos, dir, sideM);
+    dir = (dir + exteriorAngle) % 360.0; // 時計回りに外角分だけ回転
+    return pos;
+  });
+}
 
 /// Haversine 逆算: 起点から指定方位・距離にある点を返す
 ///
