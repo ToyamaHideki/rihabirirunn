@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'db_connect.dart';
 
 import 'tables/condition_logs.dart';
 import 'tables/gps_points.dart';
@@ -21,9 +22,9 @@ part 'database.g.dart';
   PainAreas,
 ])
 class AppDatabase extends _$AppDatabase {
-  /// [driftDatabase] は iOS/Android/Web を自動判別する drift_flutter の公式ヘルパー。
-  /// Web では IndexedDB + WASM SQLite、Native では SQLite ファイルを使用する。
-  AppDatabase() : super(driftDatabase(name: 'rihabiri_run'));
+  /// [openDriftDatabase] はプラットフォームを自動判別する条件付きインポート。
+  /// Web では WebDatabase + sql.js、Native では drift_flutter の driftDatabase を使用する。
+  AppDatabase() : super(openDriftDatabase());
 
   @override
   int get schemaVersion => 1;

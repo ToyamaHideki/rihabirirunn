@@ -19,6 +19,13 @@
   <title>リハビリウォーク</title>
   <link rel="manifest" href="manifest.json">
 
+  <!--
+    sql.js: drift の WebDatabase が使用する SQLite エンジン。
+    IndexedDB にデータを永続化するため、リロード後もデータが保持される。
+    WasmDatabase (drift_flutter デフォルト) は GitHub Pages では
+    drift_worker.js が必要なため、sql.js ベースの WebDatabase を使用。
+  -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
 
 </head>
 <body>
