@@ -44,10 +44,17 @@ jobs:
       - name: Create .env file
         run: echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" > .env
 
-      # drift の Web 向けアセット生成（sqlite3.wasm と drift_worker.js）
-      # GitHub Pages では OPFS/SharedArrayBuffer が使えないため IndexedDB フォールバックが必要
-      - name: Build Drift Web Assets
-        run: dart run drift_dev:build_web_assets
+      # sqlite3.wasm を pub キャッシュから web/ にコピー
+      # GitHub Pages では OPFS/SharedArrayBuffer が使えないため IndexedDB フォールバック用に必要
+      - name: Copy sqlite3.wasm for web
+        run: |
+          WASM=$(find "$HOME/.pub-cache" -name "sqlite3.wasm" | head -1)
+          if [ -n "$WASM" ]; then
+            cp "$WASM" web/sqlite3.wasm
+            echo "Copied sqlite3.wasm from: $WASM"
+          else
+            echo "sqlite3.wasm not found in pub cache, skipping"
+          fi
 
       - name: Build Web
         run: flutter build web --base-href /rihabirirunn/ --release
