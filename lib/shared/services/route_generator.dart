@@ -28,7 +28,7 @@ const _kUTurnSampleN = 20;
 
 /// 折り返し回避のための距離拡大率リスト
 /// U-ターン検出時に順番に試行する（元の距離 → +25% → +50%）
-const _kUTurnMultipliers = [1.0, 1.25, 1.5];
+const _kUTurnMultipliers = [1.0, 1.1, 1.2];
 
 /// 1日の最大ルート生成リクエスト回数（ユーザー向け）— T-1.2.4
 const _kDailyLimit = 10;
@@ -151,11 +151,12 @@ class RouteGenerator {
       // U-ターンあり → 次の距離で再試行
     }
 
-    // 全距離でU-ターンを回避できなかった → フォールバック結果を返す
+    // 全距離でU-ターンを回避できなかった → フォールバック結果を返す（hasUTurns=true でUI警告）
     if (bestResult != null) {
       _incrementRateLimit();
-      _cache[cacheKey] = bestResult;
-      return RouteSuccess(bestResult);
+      final withFlag = bestResult.copyWith(hasUTurns: true);
+      _cache[cacheKey] = withFlag;
+      return RouteSuccess(withFlag);
     }
 
     return const RouteFailure(

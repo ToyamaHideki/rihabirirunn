@@ -312,6 +312,34 @@ class _PreviewPanel extends StatelessWidget {
             ],
           ),
 
+          // U-ターン警告（短距離で折り返しが発生した場合）
+          if (result.hasUTurns) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      color: Colors.orange.shade700, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '短距離では道路の制約により折り返しが生じる場合があります。「別のルートを生成」で改善することがあります。',
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: Colors.orange.shade800),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // エラーメッセージ
           if (error != null) ...[
             const SizedBox(height: 8),

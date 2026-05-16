@@ -24,6 +24,7 @@ class RouteResult {
     required this.distanceMeters,
     required this.durationSeconds,
     required this.routeType,
+    this.hasUTurns = false,
   });
 
   /// ルートを構成する座標列（GeoJSON LineString の各点）
@@ -37,6 +38,21 @@ class RouteResult {
 
   /// ルート種別
   final RouteType routeType;
+
+  /// 折り返し（U-ターン）が含まれるか
+  ///
+  /// 短距離では道路ネットワークの制約により折り返しが生じることがある。
+  /// true の場合、UI でユーザーへの注意メッセージを表示する。
+  final bool hasUTurns;
+
+  /// フィールドを部分的に上書きしたコピーを返す
+  RouteResult copyWith({bool? hasUTurns}) => RouteResult(
+        points: points,
+        distanceMeters: distanceMeters,
+        durationSeconds: durationSeconds,
+        routeType: routeType,
+        hasUTurns: hasUTurns ?? this.hasUTurns,
+      );
 
   double get distanceKm => distanceMeters / 1000.0;
 
