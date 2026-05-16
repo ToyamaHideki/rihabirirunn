@@ -44,17 +44,24 @@ jobs:
       - name: Create .env file
         run: echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" > .env
 
-      # sqlite3.wasm を pub キャッシュから web/ にコピー
-      # GitHub Pages では OPFS/SharedArrayBuffer が使えないため IndexedDB フォールバック用に必要
-      - name: Copy sqlite3.wasm for web
+      # sqlite3.wasm を GitHub Releases からダウンロード
+      # drift_flutter は Web で WasmDatabase を使用するため sqlite3.wasm が必須
+      # GitHub Pages では OPFS/SharedArrayBuffer が使えないため IndexedDB フォールバックを使用
+      - name: Download sqlite3.wasm for web
         run: |
-          WASM=$(find "$HOME/.pub-cache" -name "sqlite3.wasm" | head -1)
-          if [ -n "$WASM" ]; then
-            cp "$WASM" web/sqlite3.wasm
-            echo "Copied sqlite3.wasm from: $WASM"
-          else
-            echo "sqlite3.wasm not found in pub cache, skipping"
-          fi
+          VER=$(grep -A5 'name: sqlite3$' pubspec.lock \
+            | grep 'version:' | head -1 | awk '{print $2}' | tr -d '"')
+          echo "sqlite3 version: ${VER}"
+          URL="https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-${VER}/sqlite3.wasm"
+          echo "Downloading: ${URL}"
+          curl -fsSL -o web/sqlite3.wasm "${URL}" \
+            && echo "✓ sqlite3.wasm downloaded ($(wc -c < web/sqlite3.wasm) bytes)" \
+            || {
+              echo "Specific version not found, trying latest..."
+              curl -fsSL -o web/sqlite3.wasm \
+                "https://github.com/simolus3/sqlite3.dart/releases/latest/download/sqlite3.wasm" \
+                && echo "✓ sqlite3.wasm (latest) downloaded"
+            }
 
       - name: Build Web
         run: flutter build web --base-href /rihabirirunn/ --release
