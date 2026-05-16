@@ -44,6 +44,15 @@ jobs:
       - name: Create .env file
         run: echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" > .env
 
+      # sql.js の WASM バイナリを web/ に配置
+      # WebDatabase (drift) は sql-wasm.wasm をページと同一オリジンから取得する
+      # CDN の JS ファイルと同バージョン (1.10.3) を使用
+      - name: Download sql-wasm.wasm for web
+        run: |
+          curl -fsSL -o web/sql-wasm.wasm \
+            "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.wasm" \
+            && echo "✓ sql-wasm.wasm ($(wc -c < web/sql-wasm.wasm) bytes)"
+
       - name: Build Web
         run: flutter build web --base-href /rihabirirunn/ --release
 
