@@ -44,6 +44,11 @@ jobs:
       - name: Create .env file
         run: echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" > .env
 
+      # drift の Web 向けアセット生成（sqlite3.wasm と drift_worker.js）
+      # GitHub Pages では OPFS/SharedArrayBuffer が使えないため IndexedDB フォールバックが必要
+      - name: Build Drift Web Assets
+        run: dart run drift_dev:build_web_assets
+
       - name: Build Web
         run: flutter build web --base-href /rihabirirunn/ --release
 

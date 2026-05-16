@@ -19,7 +19,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _navigate();
+    // 最初のフレーム描画後に遷移処理を開始（Web での早期呼び出しを防ぐ）
+    WidgetsBinding.instance.addPostFrameCallback((_) => _navigate());
   }
 
   Future<void> _navigate() async {
@@ -27,28 +28,39 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
 
-    // DB にプロフィールが存在するか確認（T-0.3.3: 初回起動判定）
-    final profile =
-        await ref.read(userProfileRepositoryProvider).getProfile();
+    try {
+      // DB にプロフィールが存在するか確認（T-0.3.3: 初回起動判定）
+      // Web では drift_flutter の WASM/IndexedDB 初期化が非同期になるため
+      // 10秒のタイムアウトを設けて無限待機を防ぐ
+      final profile = await ref
+          .read(userProfileRepositoryProvider)
+          .getProfile()
+          .timeout(const Duration(seconds: 10));
 
-    if (!mounted) return;
-
-    if (profile == null) {
-      // 初回起動 → オンボーディングへ
-      context.go(AppRoutes.disclaimer);
-      return;
-    }
-
-    // T-2.3.2: 中断走行スナップショットの確認
-    final snapshot = await ref.read(runSnapshotServiceProvider).load();
-    if (!mounted) return;
-
-    if (snapshot != null) {
-      await _showInterruptedRunDialog(snapshot);
       if (!mounted) return;
-    }
 
-    context.go(AppRoutes.home);
+      if (profile == null) {
+        // 初回起動 → オンボーディングへ
+        context.go(AppRoutes.disclaimer);
+        return;
+      }
+
+      // T-2.3.2: 中断走行スナップショットの確認
+      final snapshot = await ref.read(runSnapshotServiceProvider).load();
+      if (!mounted) return;
+
+      if (snapshot != null) {
+        await _showInterruptedRunDialog(snapshot);
+        if (!mounted) return;
+      }
+
+      context.go(AppRoutes.home);
+    } catch (e, st) {
+      // DB 初期化エラー・タイムアウト時は初回起動として扱いオンボーディングへ
+      debugPrint('[SplashScreen] navigate error: $e\n$st');
+      if (!mounted) return;
+      context.go(AppRoutes.disclaimer);
+    }
   }
 
   /// T-2.3.2: 中断走行ダイアログ — 破棄のみ選択可能（DB 保存は T-2.4 で対応）
