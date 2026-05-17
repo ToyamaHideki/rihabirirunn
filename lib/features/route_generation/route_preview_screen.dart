@@ -109,6 +109,90 @@ class _RoutePreviewScreenState extends ConsumerState<RoutePreviewScreen> {
     return LatLng(sumLat / points.length, sumLng / points.length);
   }
 
+  // ---------------------------------------------------------------------------
+  // ポリライン オフセット描画
+  // ---------------------------------------------------------------------------
+
+  /// 周回ルート用: 前半(往路)と後半(復路)を分けて 2 本のオフセットポリラインで描画。
+  ///
+  /// 共通区間では 2 色が隣接して見え（ズーム 16 以上で明確分離）、
+  /// 分岐点では色が二叉に分かれるため「どちらへ進むか」が一目で分かる。
+  PolylineLayer _buildOffsetPolylineLayer(
+    List<LatLng> points,
+    ColorScheme colorScheme,
+  ) {
+    final mid = points.length ~/ 2;
+    final outbound = points.sublist(0, mid + 1); // 往路: 始点 → 折返し点
+    final returning = points.sublist(mid);        // 復路: 折返し点 → 終点
+
+    // 4 m オフセット: ズーム 16 以上で視覚的に分離
+    const kOffset = 4.0;
+    const kOrange = Color(0xFFF57C00); // Colors.orange.shade700 相当
+
+    return PolylineLayer(
+      polylines: [
+        // 往路（テーマカラー・右オフセット）
+        Polyline(
+          points: _offsetPolyline(outbound, kOffset),
+          strokeWidth: 4.5,
+          color: colorScheme.primary,
+          borderColor: colorScheme.primary.withValues(alpha: 0.25),
+          borderStrokeWidth: 1.5,
+        ),
+        // 復路（オレンジ・左オフセット）
+        Polyline(
+          points: _offsetPolyline(returning, -kOffset),
+          strokeWidth: 4.5,
+          color: kOrange,
+          borderColor: kOrange.withValues(alpha: 0.25),
+          borderStrokeWidth: 1.5,
+        ),
+      ],
+    );
+  }
+
+  /// ポリラインを進行方向の右側に [offsetMeters] だけ平行移動した点列を返す。
+  ///
+  /// 負値のとき左側に移動する。前後セグメントの方向を平均して
+  /// 折れ目のある箇所でも滑らかな法線を算出する。
+  List<LatLng> _offsetPolyline(List<LatLng> points, double offsetMeters) {
+    if (points.length < 2) return List.of(points);
+    const metersPerDeg = 111319.9;
+    final result = <LatLng>[];
+
+    for (int i = 0; i < points.length; i++) {
+      double sumE = 0.0, sumN = 0.0;
+
+      // セグメント (a→b) の正規化方向ベクトルを East/North 成分で累積
+      void accum(LatLng a, LatLng b) {
+        final midLat = (a.latitude + b.latitude) / 2;
+        final cosLat = math.cos(midLat * math.pi / 180);
+        final dE = (b.longitude - a.longitude) * cosLat;
+        final dN = b.latitude - a.latitude;
+        final len = math.sqrt(dE * dE + dN * dN);
+        if (len > 1e-12) {
+          sumE += dE / len;
+          sumN += dN / len;
+        }
+      }
+
+      if (i > 0) accum(points[i - 1], points[i]);
+      if (i < points.length - 1) accum(points[i], points[i + 1]);
+
+      // 進行方向 (sumE, sumN) の右直角法線 = (sumN, -sumE) / |(sumE, sumN)|
+      final len = math.sqrt(sumE * sumE + sumN * sumN);
+      final rE = len > 1e-12 ? sumN / len : 0.0;
+      final rN = len > 1e-12 ? -sumE / len : 0.0;
+
+      final cosLat = math.cos(points[i].latitude * math.pi / 180);
+      result.add(LatLng(
+        points[i].latitude + rN * offsetMeters / metersPerDeg,
+        points[i].longitude + rE * offsetMeters / (metersPerDeg * cosLat),
+      ));
+    }
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -125,17 +209,22 @@ class _RoutePreviewScreenState extends ConsumerState<RoutePreviewScreen> {
     final center = _routeCenter(result.points);
 
     // T-1.3.5: ポリラインレイヤー
-    final polylineLayer = PolylineLayer(
-      polylines: [
-        Polyline(
-          points: result.points,
-          strokeWidth: 5.0,
-          color: colorScheme.primary,
-          borderColor: colorScheme.primary.withValues(alpha: 0.3),
-          borderStrokeWidth: 2.0,
-        ),
-      ],
-    );
+    // 周回ルートは往路・復路を 2 本のオフセット線で表示（重複区間の方向を視覚的に区別）
+    // 片道ルートは従来通り 1 本
+    final polylineLayer =
+        result.routeType == RouteType.circular && result.points.length >= 4
+            ? _buildOffsetPolylineLayer(result.points, colorScheme)
+            : PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: result.points,
+                    strokeWidth: 5.0,
+                    color: colorScheme.primary,
+                    borderColor: colorScheme.primary.withValues(alpha: 0.3),
+                    borderStrokeWidth: 2.0,
+                  ),
+                ],
+              );
 
     // 出発地・終点マーカー
     final markerLayer = MarkerLayer(
@@ -327,6 +416,25 @@ class _PreviewPanel extends StatelessWidget {
             ],
           ),
 
+          // 往路/復路 凡例（周回ルートのみ）
+          if (result.routeType == RouteType.circular) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _LegendLine(
+                  color: Theme.of(context).colorScheme.primary,
+                  label: '往路',
+                ),
+                const SizedBox(width: 24),
+                _LegendLine(
+                  color: const Color(0xFFF57C00),
+                  label: '復路',
+                ),
+              ],
+            ),
+          ],
+
           // 距離乖離メッセージ（実際の距離が目標から 5% 超ずれた場合）
           if (hasDistanceDeviation) ...[
             const SizedBox(height: 12),
@@ -447,6 +555,36 @@ class _InfoChip extends StatelessWidget {
           sublabel,
           style: textTheme.labelSmall
               ?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
+}
+
+/// 往路/復路 凡例: 色付き線サンプル + ラベル
+class _LegendLine extends StatelessWidget {
+  const _LegendLine({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 28,
+          height: 4,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall,
         ),
       ],
     );
