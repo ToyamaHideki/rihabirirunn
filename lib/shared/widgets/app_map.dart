@@ -13,6 +13,7 @@ import '../services/location_service.dart';
 /// - 現在地へ自動センタリング（MapController）
 /// - 現在地マーカー（精度サークル + 位置ドット）
 /// - タップコールバック・初期中心指定（T-1.3 で追加）
+/// - 走行追跡中は [currentPosition] を渡すことで位置ドットをリアルタイム追従
 class AppMap extends ConsumerStatefulWidget {
   const AppMap({
     super.key,
@@ -20,6 +21,7 @@ class AppMap extends ConsumerStatefulWidget {
     this.initialCenter,
     this.showCurrentLocation = true,
     this.centerOnLocationUpdate = true,
+    this.currentPosition,
     this.onMapReady,
     this.onTap,
     this.layers = const [],
@@ -36,6 +38,10 @@ class AppMap extends ConsumerStatefulWidget {
 
   /// 位置情報が更新されたときに地図を自動センタリングするか
   final bool centerOnLocationUpdate;
+
+  /// 現在地の上書き座標（走行追跡中など外部から位置を供給する場合に指定）。
+  /// null のときは [currentPositionProvider]（一発取得）の位置を使用する。
+  final LatLng? currentPosition;
 
   /// マップ描画完了コールバック
   final VoidCallback? onMapReady;
@@ -67,11 +73,19 @@ class _AppMapState extends ConsumerState<AppMap> {
     super.dispose();
   }
 
-  void _moveTo(Position pos) {
-    _mapController.move(
-      LatLng(pos.latitude, pos.longitude),
-      widget.initialZoom,
-    );
+  void _moveTo(LatLng point) {
+    _mapController.move(point, widget.initialZoom);
+  }
+
+  @override
+  void didUpdateWidget(AppMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 外部指定の現在地が変化したらマップを追従（走行追跡中のリアルタイム更新）
+    if (!_mapReady || !widget.centerOnLocationUpdate) return;
+    final newPos = widget.currentPosition;
+    if (newPos != null && newPos != oldWidget.currentPosition) {
+      _moveTo(newPos);
+    }
   }
 
   @override
@@ -80,17 +94,23 @@ class _AppMapState extends ConsumerState<AppMap> {
     final position = posAsync.valueOrNull;
     final colorScheme = Theme.of(context).colorScheme;
 
+    // 外部指定の現在地があればそちらを優先（走行追跡中など）
+    final effectiveLatLng = widget.currentPosition ??
+        (position != null
+            ? LatLng(position.latitude, position.longitude)
+            : null);
+
     // 位置情報が変化したらマップをセンタリング（T-1.1.2）
+    // 外部指定がある場合は didUpdateWidget で処理するためスキップ
     ref.listen<AsyncValue<Position?>>(currentPositionProvider, (_, next) {
       if (!_mapReady || !widget.centerOnLocationUpdate) return;
+      if (widget.currentPosition != null) return; // 外部指定がある場合は無視
       final pos = next.valueOrNull;
-      if (pos != null) _moveTo(pos);
+      if (pos != null) _moveTo(LatLng(pos.latitude, pos.longitude));
     });
 
     // 初期中心: 引数指定 > 現在地 > 東京駅
-    final defaultCenter = position != null
-        ? LatLng(position.latitude, position.longitude)
-        : const LatLng(35.6812362, 139.7671248);
+    final defaultCenter = effectiveLatLng ?? const LatLng(35.6812362, 139.7671248);
 
     return FlutterMap(
       mapController: _mapController,
@@ -99,8 +119,12 @@ class _AppMapState extends ConsumerState<AppMap> {
         initialZoom: widget.initialZoom,
         onMapReady: () {
           _mapReady = true;
-          if (widget.initialCenter == null && position != null) {
-            _moveTo(position);
+          if (widget.initialCenter == null) {
+            if (widget.currentPosition != null) {
+              _moveTo(widget.currentPosition!);
+            } else if (position != null) {
+              _moveTo(LatLng(position.latitude, position.longitude));
+            }
           }
           widget.onMapReady?.call();
         },
@@ -116,23 +140,26 @@ class _AppMapState extends ConsumerState<AppMap> {
         ),
 
         // T-1.1.3: 現在地（精度サークル + 位置ドット）
-        if (widget.showCurrentLocation && position != null) ...[
-          CircleLayer(
-            circles: [
-              CircleMarker(
-                point: LatLng(position.latitude, position.longitude),
-                radius: position.accuracy.clamp(5.0, 200.0),
-                useRadiusInMeter: true,
-                color: colorScheme.primary.withValues(alpha: 0.15),
-                borderColor: colorScheme.primary.withValues(alpha: 0.4),
-                borderStrokeWidth: 1.0,
-              ),
-            ],
-          ),
+        if (widget.showCurrentLocation && effectiveLatLng != null) ...[
+          // 精度サークル: FutureProvider の Position が利用可能なときのみ表示
+          // （外部指定の LatLng には accuracy 情報がないため省略）
+          if (position != null && widget.currentPosition == null)
+            CircleLayer(
+              circles: [
+                CircleMarker(
+                  point: LatLng(position.latitude, position.longitude),
+                  radius: position.accuracy.clamp(5.0, 200.0),
+                  useRadiusInMeter: true,
+                  color: colorScheme.primary.withValues(alpha: 0.15),
+                  borderColor: colorScheme.primary.withValues(alpha: 0.4),
+                  borderStrokeWidth: 1.0,
+                ),
+              ],
+            ),
           MarkerLayer(
             markers: [
               Marker(
-                point: LatLng(position.latitude, position.longitude),
+                point: effectiveLatLng,
                 width: 20,
                 height: 20,
                 child: _LocationDot(color: colorScheme.primary),

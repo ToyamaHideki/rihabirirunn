@@ -314,6 +314,10 @@ class _ActiveRunScreenState extends ConsumerState<ActiveRunScreen> {
               showCurrentLocation: true,
               // 走行中のみ追跡センタリング（一時停止中は固定）
               centerOnLocationUpdate: trackingState.isTracking,
+              // GPS 位置が記録され次第ドット・地図中心をリアルタイム更新
+              currentPosition: trackingState.positions.isNotEmpty
+                  ? trackingState.positions.last
+                  : null,
               layers: [
                 ?plannedLayer,
                 ?actualLayer,
