@@ -62,6 +62,9 @@ class DirectionsService {
       'geometries=geojson',
       'overview=full',
       'steps=false',
+      // 未舗装道路（公園の砂利道・河川沿いの非公式路・農道など）を除外し
+      // 舗装された道路・歩道のみを使うルートを生成する
+      'exclude=unpaved',
     ];
     // continue_straight は中間ウェイポイントがある場合のみ有効
     if (waypoints.length > 2 && continueStraight) {
