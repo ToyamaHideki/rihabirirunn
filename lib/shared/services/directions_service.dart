@@ -58,13 +58,14 @@ class DirectionsService {
         .join(';');
 
     // クエリパラメータを動的に組み立てる
+    // NOTE: exclude=unpaved は driving/cycling プロファイルのみ有効。
+    //       walking プロファイルで指定すると InvalidInput エラーになるため使用不可。
+    //       walking プロファイルは元来、未舗装の非公式路より歩道・舗装路を優先するため
+    //       ウェイポイントを適切に配置すれば概ね舗装路ルートが得られる。
     final params = <String>[
       'geometries=geojson',
       'overview=full',
       'steps=false',
-      // 未舗装道路（公園の砂利道・河川沿いの非公式路・農道など）を除外し
-      // 舗装された道路・歩道のみを使うルートを生成する
-      'exclude=unpaved',
     ];
     // continue_straight は中間ウェイポイントがある場合のみ有効
     if (waypoints.length > 2 && continueStraight) {
